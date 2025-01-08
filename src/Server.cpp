@@ -57,18 +57,21 @@ int main(int argc, char **argv) {
 
   // accept(server_fd, (struct sockaddr *)&client_addr,
   //        (socklen_t *)&client_addr_len);
+  int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
+                         (socklen_t *)&client_addr_len);
+
+  std::cout << "Client connected\n" << client_fd;
+
   while (true) {
-    int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
-                           (socklen_t *)&client_addr_len);
-    if (!client_fd)
-      break;
-    std::cout << "Client connected\n";
+    char buffer[1024] = {0};
+    recv(client_fd, buffer, sizeof(buffer), 0);
+    std::cout << "\nMessage from client: " << buffer << "End of Message\n";
 
     std::string response = "+PONG\r\n";
     send(client_fd, response.c_str(), response.size(), 0);
-
-    close(client_fd);
   }
+
+  close(client_fd);
   close(server_fd);
 
   return 0;
