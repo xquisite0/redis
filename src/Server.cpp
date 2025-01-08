@@ -22,11 +22,24 @@ void handleClient(int client_fd) {
 
     ProtocolParser parser;
     RedisMessage message = parser.parse(buffer);
+    std::string response;
 
-    std::cout << "Size of Array in client message: " << message.elements.size()
-              << std::endl;
+    // Checking for ECHO command
+    if (!message.elements.empty()) {
+      RedisMessage firstElement = message.elements[0];
+      if (firstElement.type == SIMPLE_STRING) {
 
-    std::string response = "+PONG\r\n";
+        std::string command = "";
+        for (char c : firstElement.value) {
+          command += tolower(c);
+        }
+        if (command == "echo") {
+          response = "+" + message.elements[1].value + "\r\n";
+        }
+      }
+    }
+
+    // std::string response = "+PONG\r\n";
     send(client_fd, response.c_str(), response.size(), 0);
   }
   close(client_fd);
