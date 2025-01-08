@@ -16,7 +16,7 @@ public:
 
   RedisMessage parse(char *message) {
     int pos = 0;
-    parseMessage(message, pos);
+    return parseMessage(message, pos);
   }
 
 private:
