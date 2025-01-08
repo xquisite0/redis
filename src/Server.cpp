@@ -11,9 +11,10 @@
 #include <sys/types.h>
 #include <thread>
 #include <unistd.h>
+#include <unordered_map>
 
 void handleClient(int client_fd) {
-  std::unordered_map<std::string, std::string> map;
+  std::unordered_map<std::string, std::string> keyValue;
 
   char buffer[1024];
   while (true) {
@@ -41,13 +42,13 @@ void handleClient(int client_fd) {
         } else if (command == "ping") {
           response = "+PONG\r\n";
         } else if (command == "set") {
-          map[message.elements[1].value] = message.elements[2].value;
+          keyValue[message.elements[1].value] = message.elements[2].value;
         } else if (command == "get") {
-          if (map.find(message.elements[1].value) == map.end()) {
+          if (keyValue.find(message.elements[1].value) == keyValue.end()) {
             response = "$-1\r\n";
             break;
           }
-          std::string value = map[message.elements[1].value];
+          std::string value = keyValue[message.elements[1].value];
           response =
               "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
         }
