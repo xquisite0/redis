@@ -43,8 +43,13 @@ void handleClient(int client_fd) {
         } else if (command == "set") {
           map[message.elements[1].value] = message.elements[2].value;
         } else if (command == "get") {
+          if (map.find(message.elements[1].value) == map.end()) {
+            response = "$-1\r\n";
+            break;
+          }
           std::string value = map[message.elements[1].value];
-          response = "$" + value.size() + "\r\n" + value + "\r\n";
+          response =
+              "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
         }
       }
     }
