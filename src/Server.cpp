@@ -18,7 +18,7 @@ void handleClient(int client_fd) {
     int bytesRead = read(client_fd, buffer, sizeof(buffer));
     if (bytesRead <= 0)
       break;
-    std::cout << "Client: " << buffer << std::endl;
+    // std::cout << "Client: " << buffer << std::endl;
 
     ProtocolParser parser;
     RedisMessage message = parser.parse(buffer);
@@ -33,6 +33,7 @@ void handleClient(int client_fd) {
         for (char c : firstElement.value) {
           command += tolower(c);
         }
+        std::cout << "Command Name: " << command << "\n";
         if (command == "echo") {
           response = "+" + message.elements[1].value + "\r\n";
         }
