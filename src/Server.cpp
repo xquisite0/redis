@@ -23,14 +23,14 @@ void splitBuffer(const char *buffer) {
 
   while (std::getline(stream, token, '\n')) {
     // Remove trailing '\r' if present
-    if (!token.empty() && token.back() == '\r') {
+    if (!token.empty() && (token.back() == '\r' || token.back() == '\n')) {
       token.pop_back();
     }
-    if (!firstTokenSet)
-      firstToken = token;
+    // if (!firstTokenSet)
+    //   firstToken = token;
 
-    if (firstToken == "ECHO")
-      response = token;
+    // if (firstToken == "echo")
+    //   response = token;
     std::cout << "Token: " << token << std::endl;
   }
 }
