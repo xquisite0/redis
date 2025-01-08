@@ -27,4 +27,4 @@ private:
   RedisMessage parseInteger(char *message, int &pos);
   RedisMessage parseBulkString(char *message, int &pos);
   RedisMessage parseArray(char *message, int &pos);
-} parser;
+};

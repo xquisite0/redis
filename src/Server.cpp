@@ -20,6 +20,7 @@ void handleClient(int client_fd) {
       break;
     std::cout << "Client: " << buffer << std::endl;
 
+    ProtocolParser parser;
     RedisMessage message = parser.parse(buffer);
 
     std::cout << "Size of Array in client message: " << message.elements.size()
