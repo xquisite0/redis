@@ -10,6 +10,20 @@
 #include <thread>
 #include <unistd.h>
 
+void splitBuffer(const char *buffer) {
+  std::string data(buffer);
+  std::string token;
+  std::istringstream stream(data);
+
+  while (std::getline(stream, token, '\n')) {
+    // Remove trailing '\r' if present
+    if (!token.empty() && token.back() == '\r') {
+      token.pop_back();
+    }
+    std::cout << "Token: " << token << std::endl;
+  }
+}
+
 void handleClient(int client_fd) {
   char buffer[1024];
   while (true) {
@@ -17,6 +31,8 @@ void handleClient(int client_fd) {
     if (bytesRead <= 0)
       break;
     std::cout << "Client: " << buffer << std::endl;
+
+    splitBuffer(buffer);
 
     std::string response = "+PONG\r\n";
     send(client_fd, response.c_str(), response.size(), 0);
@@ -84,16 +100,6 @@ int main(int argc, char **argv) {
     std::cout << "Client connected\n" << client_fd;
   }
 
-  // while (true) {
-  //   char buffer[1024] = {0};
-  //   recv(client_fd, buffer, sizeof(buffer), 0);
-  //   std::cout << "\nMessage from client: " << buffer << "End of Message\n";
-
-  //   std::string response = "+PONG\r\n";
-  //   send(client_fd, response.c_str(), response.size(), 0);
-  // }
-
-  // close(client_fd);
   close(server_fd);
 
   return 0;
