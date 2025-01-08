@@ -1,3 +1,4 @@
+#include "ProtocolParser.h"
 #include <arpa/inet.h>
 #include <cstdlib>
 #include <cstring>
@@ -11,30 +12,6 @@
 #include <thread>
 #include <unistd.h>
 
-std::string response;
-
-void splitBuffer(const char *buffer) {
-  std::string data(buffer);
-  std::string token;
-  std::istringstream stream(data);
-
-  std::string firstToken;
-  bool firstTokenSet = false;
-
-  while (std::getline(stream, token, '\n')) {
-    // Remove trailing '\r' if present
-    if (!token.empty() && (token.back() == '\r' || token.back() == '\n')) {
-      token.pop_back();
-    }
-    // if (!firstTokenSet)
-    //   firstToken = token;
-
-    // if (firstToken == "echo")
-    //   response = token;
-    std::cout << "Token: " << token << std::endl;
-  }
-}
-
 void handleClient(int client_fd) {
   char buffer[1024];
   while (true) {
@@ -43,10 +20,7 @@ void handleClient(int client_fd) {
       break;
     std::cout << "Client: " << buffer << std::endl;
 
-    splitBuffer(buffer);
-
-    response =
-        "$" + std::to_string(response.size()) + "\r\n" + response + "\r\n";
+    std::string response = "+PONG\r\n";
     send(client_fd, response.c_str(), response.size(), 0);
   }
   close(client_fd);
