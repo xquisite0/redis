@@ -1,4 +1,5 @@
 #include <iostream>
+#include <vector>
 
 enum MessageType { SIMPLE_STRING, SIMPLE_ERROR, INTEGER, BULK_STRING, ARRAY };
 
@@ -6,7 +7,13 @@ struct RedisMessage {
   MessageType type;
   std::string value;
   std::vector<RedisMessage> elements;
-};
+
+  RedisMessage(MessageType t, const std::string &v = "",
+               const std::vector<RedisMessage> &e = std::vector<RedisMessage>())
+      : type(t), value(v), elements(e) {}
+}
+
+;
 
 class ProtocolParser {
 public:

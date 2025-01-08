@@ -27,7 +27,7 @@ RedisMessage ProtocolParser::parseSimpleString(char *message, int &pos) {
     pos++;
   }
   pos += 2;
-  return {SIMPLE_STRING, value};
+  return RedisMessage(SIMPLE_STRING, value);
 }
 RedisMessage ProtocolParser::parseSimpleError(char *message, int &pos) {
   std::string value = "";
@@ -36,7 +36,7 @@ RedisMessage ProtocolParser::parseSimpleError(char *message, int &pos) {
     pos++;
   }
   pos += 2;
-  return {SIMPLE_ERROR, value};
+  return RedisMessage(SIMPLE_ERROR, value);
 }
 RedisMessage ProtocolParser::parseInteger(char *message, int &pos) {
   std::string value = "";
@@ -45,7 +45,7 @@ RedisMessage ProtocolParser::parseInteger(char *message, int &pos) {
     pos++;
   }
   pos += 2;
-  return {INTEGER, value};
+  return RedisMessage(INTEGER, value);
 }
 RedisMessage ProtocolParser::parseBulkString(char *message, int &pos) {
   std::string lengthString = "";
@@ -55,7 +55,7 @@ RedisMessage ProtocolParser::parseBulkString(char *message, int &pos) {
   }
   int length = stoi(lengthString);
   if (length == -1)
-    return {BULK_STRING, ""};
+    return RedisMessage(BULK_STRING, "");
 
   // onto the string
   std::string value = "";
@@ -65,7 +65,7 @@ RedisMessage ProtocolParser::parseBulkString(char *message, int &pos) {
     pos++;
   }
   pos += 2;
-  return {BULK_STRING, value};
+  return RedisMessage(BULK_STRING, value);
 }
 RedisMessage ProtocolParser::parseArray(char *message, int &pos) {
   std::string lengthString = "";
@@ -81,5 +81,5 @@ RedisMessage ProtocolParser::parseArray(char *message, int &pos) {
   for (int i = 0; i < length; i++) {
     elements.push_back(parseMessage(message, pos));
   }
-  return {ARRAY, "", elements};
+  return RedisMessage(ARRAY, "", elements);
 }
