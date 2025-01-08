@@ -1,4 +1,6 @@
+#include "ProtocolParser.h"
 #include <iostream>
+#include <vector>
 
 enum MessageType { SIMPLE_STRING, SIMPLE_ERROR, INTEGER, BULK_STRING, ARRAY };
 
@@ -12,20 +14,23 @@ class ProtocolParser {
 public:
   int cursor = 0;
 
-  RedisMessage parse(char *message) { parseMessage(message, 0) }
+  RedisMessage parse(char *message) {
+    int pos = 0;
+    parseMessage(message, pos);
+  }
 
 private:
   RedisMessage parseMessage(char *message, int &pos) {
     if (message[pos] == '+') {
-      return parseSimpleString(message, pos++);
+      return parseSimpleString(message, ++pos);
     } else if (message[pos] == '-') {
-      return parseSimpleError(message, pos++);
+      return parseSimpleError(message, ++pos);
     } else if (message[pos] == ':') {
-      return parseInteger(message, pos++);
+      return parseInteger(message, ++pos);
     } else if (message[pos] == '$') {
-      return parseBulkString(message, pos++);
+      return parseBulkString(message, ++pos);
     } else if (message[pos] == '*') {
-      return parseArray(message, pos++);
+      return parseArray(message, ++pos);
     }
   }
   RedisMessage parseSimpleString(char *message, int &pos) {
@@ -91,4 +96,4 @@ private:
     }
     return {ARRAY, "", elements};
   }
-}
+};
