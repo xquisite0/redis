@@ -27,6 +27,7 @@ void handleClient(int client_fd) {
     // Checking for ECHO command
     if (!message.elements.empty()) {
       RedisMessage firstElement = message.elements[0];
+      std::cout << "First Element Type: " << firstElement.type << "\n";
       if (firstElement.type == SIMPLE_STRING) {
 
         std::string command = "";
