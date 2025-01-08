@@ -36,6 +36,8 @@ void handleClient(int client_fd) {
         std::cout << "Command Name: " << command << "\n";
         if (command == "echo") {
           response = "+" + message.elements[1].value + "\r\n";
+        } else if (command == "ping") {
+          response = "+PONG\r\n";
         }
       }
     }
