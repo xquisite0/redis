@@ -13,6 +13,8 @@
 #include <unistd.h>
 
 void handleClient(int client_fd) {
+  std::unordered_map<std::string, std::string> map;
+
   char buffer[1024];
   while (true) {
     int bytesRead = read(client_fd, buffer, sizeof(buffer));
@@ -38,6 +40,11 @@ void handleClient(int client_fd) {
           response = "+" + message.elements[1].value + "\r\n";
         } else if (command == "ping") {
           response = "+PONG\r\n";
+        } else if (command == "set") {
+          map[message.elements[1].value] = message.elements[2].value;
+        } else if (command == "get") {
+          std::string value = map[message.elements[1].value];
+          response = "$" + value.size() + "\r\n" + value + "\r\n";
         }
       }
     }
