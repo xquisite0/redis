@@ -39,10 +39,14 @@ void handleClient(int client_fd) {
         std::cout << "Command Name: " << command << "\n";
         if (command == "echo") {
           response = "+" + message.elements[1].value + "\r\n";
+
         } else if (command == "ping") {
           response = "+PONG\r\n";
+
         } else if (command == "set") {
           keyValue[message.elements[1].value] = message.elements[2].value;
+          response = "+OK\r\n";
+
         } else if (command == "get") {
           if (keyValue.find(message.elements[1].value) == keyValue.end()) {
             response = "$-1\r\n";
