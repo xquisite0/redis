@@ -63,9 +63,9 @@ int main(int argc, char **argv) {
   std::cout << "Client connected\n" << client_fd;
 
   while (true) {
-    // char buffer[1024] = {0};
-    // recv(client_fd, buffer, sizeof(buffer), 0);
-    // std::cout << "\nMessage from client: " << buffer << "End of Message\n";
+    char buffer[1024] = {0};
+    recv(client_fd, buffer, sizeof(buffer), 0);
+    std::cout << "\nMessage from client: " << buffer << "End of Message\n";
 
     std::string response = "+PONG\r\n";
     send(client_fd, response.c_str(), response.size(), 0);
