@@ -2,11 +2,27 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <mutex>
 #include <netdb.h>
 #include <string>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <thread>
 #include <unistd.h>
+
+void handleClient(int client_fd) {
+  char buffer[1024];
+  while (true) {
+    int bytesRead = read(client_fd, buffer, sizeof(buffer));
+    if (bytesRead <= 0)
+      break;
+    std::cout << "Client: " << buffer << std::endl;
+
+    std::string response = "+PONG\r\n";
+    send(client_fd, response.c_str(), response.size(), 0);
+  }
+  close(client_fd);
+}
 
 int main(int argc, char **argv) {
   // Flush after every std::cout / std::cerr
@@ -57,21 +73,27 @@ int main(int argc, char **argv) {
 
   // accept(server_fd, (struct sockaddr *)&client_addr,
   //        (socklen_t *)&client_addr_len);
-  int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
-                         (socklen_t *)&client_addr_len);
-
-  std::cout << "Client connected\n" << client_fd;
-
   while (true) {
-    char buffer[1024] = {0};
-    recv(client_fd, buffer, sizeof(buffer), 0);
-    std::cout << "\nMessage from client: " << buffer << "End of Message\n";
+    int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
+                           (socklen_t *)&client_addr_len);
 
-    std::string response = "+PONG\r\n";
-    send(client_fd, response.c_str(), response.size(), 0);
+    if (client_fd >= 0) {
+      std::thread(handleClient, client_fd).detach();
+    }
+
+    std::cout << "Client connected\n" << client_fd;
   }
 
-  close(client_fd);
+  // while (true) {
+  //   char buffer[1024] = {0};
+  //   recv(client_fd, buffer, sizeof(buffer), 0);
+  //   std::cout << "\nMessage from client: " << buffer << "End of Message\n";
+
+  //   std::string response = "+PONG\r\n";
+  //   send(client_fd, response.c_str(), response.size(), 0);
+  // }
+
+  // close(client_fd);
   close(server_fd);
 
   return 0;
