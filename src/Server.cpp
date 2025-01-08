@@ -11,16 +11,26 @@
 #include <thread>
 #include <unistd.h>
 
+std::string response;
+
 void splitBuffer(const char *buffer) {
   std::string data(buffer);
   std::string token;
   std::istringstream stream(data);
+
+  std::string firstToken;
+  bool firstTokenSet = false;
 
   while (std::getline(stream, token, '\n')) {
     // Remove trailing '\r' if present
     if (!token.empty() && token.back() == '\r') {
       token.pop_back();
     }
+    if (!firstTokenSet)
+      firstToken = token;
+
+    if (firstToken == "ECHO")
+      response = token;
     std::cout << "Token: " << token << std::endl;
   }
 }
@@ -35,7 +45,8 @@ void handleClient(int client_fd) {
 
     splitBuffer(buffer);
 
-    std::string response = "+PONG\r\n";
+    response =
+        "$" + std::to_string(response.size()) + "\r\n" + response + "\r\n";
     send(client_fd, response.c_str(), response.size(), 0);
   }
   close(client_fd);
