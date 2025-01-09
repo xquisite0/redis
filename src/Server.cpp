@@ -64,12 +64,10 @@ void handleClient(int client_fd) {
           // key has not been set
           if (keyValue.find(message.elements[1].value) == keyValue.end()) {
             response = "$-1\r\n";
-            break;
           }
-
           // key has expired
-          if (keyStartExpiry.find(message.elements[1].value) !=
-              keyStartExpiry.end()) {
+          else if (keyStartExpiry.find(message.elements[1].value) !=
+                   keyStartExpiry.end()) {
             time_t get_time;
             time(&get_time);
 
@@ -84,11 +82,11 @@ void handleClient(int client_fd) {
               response = "$-1\r\n";
               break;
             }
+          } else {
+            std::string value = keyValue[message.elements[1].value];
+            response =
+                "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
           }
-
-          std::string value = keyValue[message.elements[1].value];
-          response =
-              "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
         }
       }
     }
