@@ -103,9 +103,10 @@ void handleClient(int client_fd, const std::string &dir,
           }
         } else if (command == "config") {
           // CONFIG GET
+          std::cout << "\2nd Argument from client:"
+                    << message.elements[1].value.c_str() << "\n";
           if (message.elements.size() >= 2 &&
               strcasecmp(message.elements[1].value.c_str(), "get")) {
-            std::cout << "\nRan\n";
             if (message.elements[2].value == "dir") {
               response = "*2\r\n$3\r\ndir\r\n$" + std::to_string(dir.size()) +
                          "\r\n" + dir + "\r\n";
