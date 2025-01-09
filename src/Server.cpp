@@ -3,6 +3,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <format>
+#include <iomanip>
 #include <iostream>
 #include <mutex>
 #include <netdb.h>
@@ -13,7 +15,6 @@
 #include <thread>
 #include <unistd.h>
 #include <unordered_map>
-#include <utility>
 
 void handleClient(int client_fd) {
   std::unordered_map<std::string, std::string> keyValue;
@@ -76,8 +77,8 @@ void handleClient(int client_fd) {
                              .second; // in milliseconds
 
             double duration = difftime(get_time, set_time); // in seconds
-            std::cout << "\nDuration: " << duration << "\nExpiry: " << expiry
-                      << "\n";
+            std::cout << "\nDuration: " << std::setprecision(15) << duration
+                      << "\nExpiry: " << expiry << "\n";
             if (duration * 1000 > expiry) {
               response = "$-1\r\n";
               break;
