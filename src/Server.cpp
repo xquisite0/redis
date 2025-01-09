@@ -79,8 +79,8 @@ void handleClient(int client_fd) {
             auto set_time = keyStartExpiry[message.elements[1].value].first;
             int expiry = keyStartExpiry[message.elements[1].value].second;
 
-            std::cout << "\nget_time - set_time: " << get_time << " "
-                      << set_time << "\n";
+            // std::cout << "\nget_time - set_time: " << get_time << " "
+            // << set_time << "\n";
             double duration = (get_time - set_time).count();
             // int duration = difftime(get_time, set_time); // in seconds
             std::cout << "\nDuration: " << duration << "\nExpiry: " << expiry
