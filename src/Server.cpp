@@ -102,7 +102,7 @@ void handleClient(int client_fd, const std::string &dir,
                 "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
           }
         } else if (command == "config") {
-
+          std::cout << "\nCONFIG Path\n";
           // CONFIG GET
           if (message.elements.size() >= 2 &&
               strcasecmp(message.elements[1].value.c_str(), "get")) {
