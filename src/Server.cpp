@@ -18,7 +18,11 @@
 
 void handleClient(int client_fd) {
   std::unordered_map<std::string, std::string> keyValue;
-  std::unordered_map<std::string, std::pair<clock_t, long>> keyStartExpiry;
+  std::unordered_map<
+      std::string,
+      std::pair<std::chrono::time_point<std::chrono::high_resolution_clock>,
+                long>>
+      keyStartExpiry;
 
   char buffer[1024];
   while (true) {
@@ -53,7 +57,7 @@ void handleClient(int client_fd) {
 
           if (message.elements.size() > 2) {
             if (message.elements[3].value == "px") {
-              clock_t set_time = clock();
+              auto set_time = std::chrono::high_resolution_clock::now();
 
               keyStartExpiry[message.elements[1].value] =
                   std::make_pair(set_time, stol(message.elements[4].value));
@@ -71,16 +75,20 @@ void handleClient(int client_fd) {
           // key has expired
           if (keyStartExpiry.find(message.elements[1].value) !=
               keyStartExpiry.end()) {
-            clock_t get_time = clock();
-            clock_t set_time = keyStartExpiry[message.elements[1].value].first;
+            auto get_time = std::chrono::high_resolution_clock::now();
+            auto set_time = keyStartExpiry[message.elements[1].value].first;
             int expiry = keyStartExpiry[message.elements[1].value].second;
 
             std::cout << "\nget_time - set_time: " << get_time << " "
                       << set_time << "\n";
-            int duration = double(get_time - set_time) / CLOCKS_PER_SEC * 1000;
+            // const std::chrono::duration<double> duration =
+            // (get_time - set_time) * 1000;
+            int duration = 0;
             // int duration = difftime(get_time, set_time); // in seconds
-            std::cout << "\nDuration: " << duration << "\nExpiry: " << expiry
-                      << "\n";
+            std::cout << "\nDuration: "
+                      << std::chrono::duration<double, std::milli>(get_time -
+                                                                   set_time)
+                      << "\nExpiry: " << expiry << "\n";
             if (duration > expiry) {
               response = "$-1\r\n";
               valid = false;
