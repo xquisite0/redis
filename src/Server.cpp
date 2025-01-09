@@ -84,7 +84,7 @@ void handleClient(int client_fd) {
               break;
             }
           }
-
+          std::cout << "\nRAN\n";
           std::string value = keyValue[message.elements[1].value];
           response =
               "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
