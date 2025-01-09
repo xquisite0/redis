@@ -75,7 +75,7 @@ void handleClient(int client_fd) {
             // int duration = difftime(get_time, set_time); // in seconds
             std::cout << "\nDuration: " << duration << "\nExpiry: " << expiry
                       << "\n";
-            if (duration * 1000 > expiry) {
+            if (duration > expiry) {
               response = "$-1\r\n";
               break;
             }
