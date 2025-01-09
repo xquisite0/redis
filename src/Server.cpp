@@ -104,7 +104,8 @@ void handleClient(int client_fd, const std::string &dir,
         } else if (command == "config") {
           // CONFIG GET
           std::cout << "\2nd Argument from client:"
-                    << message.elements[1].value.c_str() << "\n";
+                    << strcasecmp(message.elements[1].value.c_str(), "get")
+                    << "\n";
           if (message.elements.size() >= 2 &&
               strcasecmp(message.elements[1].value.c_str(), "get")) {
             if (message.elements[2].value == "dir") {
