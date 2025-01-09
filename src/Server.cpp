@@ -18,7 +18,7 @@
 
 void handleClient(int client_fd) {
   std::unordered_map<std::string, std::string> keyValue;
-  std::unordered_map<std::string, std::pair<time_t, long>> keyStartExpiry;
+  std::unordered_map<std::string, std::pair<clock_t, long>> keyStartExpiry;
 
   char buffer[1024];
   while (true) {
@@ -53,8 +53,7 @@ void handleClient(int client_fd) {
 
           if (message.elements.size() > 2) {
             if (message.elements[3].value == "px") {
-              time_t set_time;
-              time(&set_time);
+              clock_t set_time = clock();
 
               keyStartExpiry[message.elements[1].value] =
                   std::make_pair(set_time, stol(message.elements[4].value));
@@ -69,16 +68,13 @@ void handleClient(int client_fd) {
           // key has expired
           else if (keyStartExpiry.find(message.elements[1].value) !=
                    keyStartExpiry.end()) {
-            time_t get_time;
-            time(&get_time);
-
-            time_t set_time = keyStartExpiry[message.elements[1].value].first;
-            int expiry = keyStartExpiry[message.elements[1].value]
-                             .second; // in milliseconds
-
-            double duration = difftime(get_time, set_time); // in seconds
-            std::cout << "\nDuration: " << std::setprecision(15) << 3.7
-                      << "\nExpiry: " << expiry << "\n";
+            clock_t get_time = clock();
+            clock_t set_time = keyStartExpiry[message.elements[1].value].first;
+            int expiry = keyStartExpiry[message.elements[1].value].second;
+            int duration = double(get_time - set_time) / CLOCKS_PER_SEC * 1000;
+            // int duration = difftime(get_time, set_time); // in seconds
+            std::cout << "\nDuration: " << duration << "\nExpiry: " << expiry
+                      << "\n";
             if (duration * 1000 > expiry) {
               response = "$-1\r\n";
               break;
