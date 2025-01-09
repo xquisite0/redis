@@ -130,8 +130,8 @@ int main(int argc, char **argv) {
   std::cout << std::unitbuf;
   std::cerr << std::unitbuf;
 
-  std::string dir;
-  std::string dbfilename;
+  std::string dir = "";
+  std::string dbfilename = "";
 
   for (int i = 1; i < argc; i++) {
     if (std::string(argv[i]) == "--dir") {
