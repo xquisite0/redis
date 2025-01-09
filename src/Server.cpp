@@ -94,6 +94,7 @@ void handleClient(int client_fd) {
     }
 
     // std::string response = "+PONG\r\n";
+    std::cout << "\nResponse to send: " << response << "\n";
     send(client_fd, response.c_str(), response.size(), 0);
   }
   close(client_fd);
