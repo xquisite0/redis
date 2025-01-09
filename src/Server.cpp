@@ -75,8 +75,7 @@ void handleClient(int client_fd) {
             clock_t set_time = keyStartExpiry[message.elements[1].value].first;
             int expiry = keyStartExpiry[message.elements[1].value].second;
 
-            std::cout << "\nget_time - set_time: "
-                      << double(get_time - set_time) << "\n";
+            std::cout << "\nCLOCKS_PER_SEC: " << CLOCKS_PER_SEC << "\n";
             int duration = double(get_time - set_time) / CLOCKS_PER_SEC * 1000;
             // int duration = difftime(get_time, set_time); // in seconds
             std::cout << "\nDuration: " << duration << "\nExpiry: " << expiry
