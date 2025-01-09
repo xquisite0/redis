@@ -61,13 +61,16 @@ void handleClient(int client_fd) {
           }
 
         } else if (command == "get") {
+          bool valid = true;
+
           // key has not been set
           if (keyValue.find(message.elements[1].value) == keyValue.end()) {
             response = "$-1\r\n";
+            valid = false;
           }
           // key has expired
-          else if (keyStartExpiry.find(message.elements[1].value) !=
-                   keyStartExpiry.end()) {
+          if (keyStartExpiry.find(message.elements[1].value) !=
+              keyStartExpiry.end()) {
             clock_t get_time = clock();
             clock_t set_time = keyStartExpiry[message.elements[1].value].first;
             int expiry = keyStartExpiry[message.elements[1].value].second;
@@ -77,9 +80,11 @@ void handleClient(int client_fd) {
                       << "\n";
             if (duration > expiry) {
               response = "$-1\r\n";
-              break;
+              valid = false;
             }
-          } else {
+          }
+
+          if (valid) {
             std::string value = keyValue[message.elements[1].value];
             response =
                 "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
