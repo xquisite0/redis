@@ -81,14 +81,10 @@ void handleClient(int client_fd) {
 
             std::cout << "\nget_time - set_time: " << get_time << " "
                       << set_time << "\n";
-            // const std::chrono::duration<double> duration =
-            // (get_time - set_time) * 1000;
-            int duration = 0;
+            double duration = (get_time - set_time).count();
             // int duration = difftime(get_time, set_time); // in seconds
-            std::cout << "\nDuration: "
-                      << std::chrono::duration<double, std::milli>(get_time -
-                                                                   set_time)
-                      << "\nExpiry: " << expiry << "\n";
+            std::cout << "\nDuration: " << duration << "\nExpiry: " << expiry
+                      << "\n";
             if (duration > expiry) {
               response = "$-1\r\n";
               valid = false;
