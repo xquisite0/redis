@@ -16,7 +16,8 @@
 #include <unistd.h>
 #include <unordered_map>
 
-void handleClient(int client_fd, std::string &dir, std::string &dbfilename) {
+void handleClient(int client_fd, const std::string &dir,
+                  const std::string &dbfilename) {
   std::unordered_map<std::string, std::string> keyValue;
   std::unordered_map<
       std::string,
