@@ -101,6 +101,7 @@ void handleClient(int client_fd) {
                 "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
           }
         }
+        std::cout << "\nCommand: " << command << "\n";
       }
     }
 
@@ -116,7 +117,17 @@ int main(int argc, char **argv) {
   std::cout << std::unitbuf;
   std::cerr << std::unitbuf;
 
-  std::cout << "Number of command line arguments passed in: " << argc << "\n";
+  std::string dir;
+  std::string dbfilename;
+
+  for (int i = 1; i < argc; i++) {
+    if (std::string(argv[i]) == "--dir") {
+      dir = argv[i + 1];
+    }
+    if (std::string(argv[i]) == "--dbfilename") {
+      dbfilename = argv[i + 1];
+    }
+  }
 
   int server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd < 0) {
