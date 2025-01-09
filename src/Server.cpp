@@ -2,6 +2,7 @@
 #include <arpa/inet.h>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <iostream>
 #include <mutex>
 #include <netdb.h>
@@ -12,9 +13,11 @@
 #include <thread>
 #include <unistd.h>
 #include <unordered_map>
+#include <utility>
 
 void handleClient(int client_fd) {
   std::unordered_map<std::string, std::string> keyValue;
+  std::unordered_map<std::string, std::pair<time_t, long>> keyStartExpiry;
 
   char buffer[1024];
   while (true) {
@@ -47,11 +50,41 @@ void handleClient(int client_fd) {
           keyValue[message.elements[1].value] = message.elements[2].value;
           response = "+OK\r\n";
 
+          if (message.elements.size() > 2) {
+            if (message.elements[3].value == "px") {
+              time_t set_time;
+              time(&set_time);
+
+              keyStartExpiry[message.elements[1].value] =
+                  std::make_pair(set_time, stol(message.elements[4].value));
+            }
+          }
+
         } else if (command == "get") {
+
+          // key has not been set
           if (keyValue.find(message.elements[1].value) == keyValue.end()) {
             response = "$-1\r\n";
             break;
           }
+
+          // key has expired
+          if (keyStartExpiry.find(message.elements[1].value) !=
+              keyStartExpiry.end()) {
+            time_t get_time;
+            time(&get_time);
+
+            time_t set_time = keyStartExpiry[message.elements[1].value].first;
+            int expiry = keyStartExpiry[message.elements[1].value]
+                             .second; // in milliseconds
+
+            double duration = difftime(get_time, set_time); // in seconds
+            if (duration * 1000 < expiry) {
+              response = "$-1\r\n";
+              break;
+            }
+          }
+
           std::string value = keyValue[message.elements[1].value];
           response =
               "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
