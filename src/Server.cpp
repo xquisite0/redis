@@ -61,7 +61,6 @@ void handleClient(int client_fd) {
           }
 
         } else if (command == "get") {
-          std::cout << "\nRAN\n";
           // key has not been set
           if (keyValue.find(message.elements[1].value) == keyValue.end()) {
             response = "$-1\r\n";
@@ -79,6 +78,7 @@ void handleClient(int client_fd) {
                              .second; // in milliseconds
 
             double duration = difftime(get_time, set_time); // in seconds
+            std::cout << "\nRAN\n";
             if (duration * 1000 < expiry) {
               response = "$-1\r\n";
               break;
