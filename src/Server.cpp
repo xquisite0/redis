@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <unordered_map>
 
-void handleClient(int client_fd) {
+void handleClient(int client_fd, std::string &dir, std::string &dbfilename) {
   std::unordered_map<std::string, std::string> keyValue;
   std::unordered_map<
       std::string,
@@ -100,8 +100,21 @@ void handleClient(int client_fd) {
             response =
                 "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
           }
+        } else if (command == "config") {
+
+          // CONFIG GET
+          if (message.elements.size() >= 2 &&
+              strcasecmp(message.elements[1].value.c_str(), "get")) {
+            if (message.elements[2].value == "dir") {
+              response = "*2\r\n$3\r\ndir\r\n$" + std::to_string(dir.size()) +
+                         "\r\n" + dir + "\r\n";
+            } else if (message.elements[2].value == "dbfilename") {
+              response = "*2\r\n$10\r\ndbfilename\r\n$" +
+                         std::to_string(dbfilename.size()) + "\r\n" +
+                         dbfilename + "\r\n";
+            }
+          }
         }
-        std::cout << "\nCommand: " << command << "\n";
       }
     }
 
@@ -178,7 +191,7 @@ int main(int argc, char **argv) {
                            (socklen_t *)&client_addr_len);
 
     if (client_fd >= 0) {
-      std::thread(handleClient, client_fd).detach();
+      std::thread(handleClient, client_fd, dir, dbfilename).detach();
     }
 
     std::cout << "Client connected\n" << client_fd;
