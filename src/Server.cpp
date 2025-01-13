@@ -52,6 +52,7 @@ int readLength(std::ifstream &is, bool &isValue) {
     uint8_t fifthByte = readByte(is);
     return fifthByte << 24 | fourthByte << 16 | thirdByte << 8 | secondByte;
   } else if (flag == 3) {
+    isValue = true;
     if (value == 0) {
       uint8_t secondByte = readByte(is);
       return secondByte;
