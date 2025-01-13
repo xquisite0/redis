@@ -31,12 +31,12 @@ static uint8_t readByte(std::ifstream &is) {
 
 int readLength(std::ifstream &is) {
   uint8_t firstByte = readByte(is);
-  std::cout << "\n First Byte: " << std::to_string(firstByte) << "\n";
+  // std::cout << "\n First Byte: " << std::to_string(firstByte) << "\n";
 
   uint8_t flag = firstByte >> 6;
   uint8_t value = firstByte & 0x3F;
-  std::cout << "\n Flag & Value: " << std::to_string(flag) << " "
-            << std::to_string(value) << "\n";
+  // std::cout << "\n Flag & Value: " << std::to_string(flag) << " "
+  // << std::to_string(value) << "\n";
 
   if (flag == 0) {
     return value;
@@ -212,15 +212,13 @@ void handleClient(int client_fd, const std::string &dir,
             } else if (opcode == 0x00) {
               std::cout << "\nThis ran!\n";
               int length = readLength(is);
-              char *keyBuffer;
-              is.read(keyBuffer, length);
+              std::string key(length, '\0');
+              is.read(&key[0], length);
 
               length = readLength(is);
-              char *valBuffer;
-              is.read(valBuffer, length);
+              std::string val(length, '\0');
+              is.read(&val[0], length);
 
-              std::string key = keyBuffer;
-              std::string val = valBuffer;
               keyValue[key] = val;
             } else if (opcode == 0xFC) {
               unsigned long time = 0;
