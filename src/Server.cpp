@@ -4,6 +4,7 @@
 #include <cstring>
 #include <ctime>
 #include <format>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <mutex>
@@ -15,6 +16,54 @@
 #include <thread>
 #include <unistd.h>
 #include <unordered_map>
+
+static void readBytes(std::ifstream &is, char *buffer, int length) {
+  if (!is.read(buffer, length)) {
+    throw std::runtime_error("Unexpected EOF when reading RDB file");
+  }
+}
+
+static uint8_t readByte(std::ifstream &is) {
+  char byte;
+  is.read(&byte, 1);
+  return static_cast<uint8_t>(byte);
+}
+
+int readLength(std::ifstream &is) {
+  uint8_t firstByte = readByte(is);
+
+  uint8_t flag = firstByte >> 6;
+  uint8_t value = firstByte | 0x3F;
+
+  if (flag == 0) {
+    return value;
+  } else if (flag == 1) {
+    uint8_t secondByte = readByte(is);
+    return value << 8 | secondByte;
+  } else if (flag == 2) {
+    uint8_t secondByte = readByte(is);
+    uint8_t thirdByte = readByte(is);
+    uint8_t fourthByte = readByte(is);
+    uint8_t fifthByte = readByte(is);
+    return fifthByte << 24 | fourthByte << 16 | thirdByte << 8 | secondByte;
+  } else if (flag == 3) {
+    if (value == 0) {
+      uint8_t secondByte = readByte(is);
+      return secondByte;
+    } else if (value == 1) {
+      uint8_t secondByte = readByte(is);
+      uint8_t thirdByte = readByte(is);
+      return thirdByte << 8 | secondByte;
+    } else if (value == 2) {
+      uint8_t secondByte = readByte(is);
+      uint8_t thirdByte = readByte(is);
+      uint8_t fourthByte = readByte(is);
+      uint8_t fifthByte = readByte(is);
+      return fifthByte << 24 | fourthByte << 16 | thirdByte << 8 | secondByte;
+    }
+  }
+  return -1;
+}
 
 void handleClient(int client_fd, const std::string &dir,
                   const std::string &dbfilename) {
@@ -116,6 +165,69 @@ void handleClient(int client_fd, const std::string &dir,
                          std::to_string(dbfilename.size()) + "\r\n" +
                          dbfilename + "\r\n";
             }
+          }
+        } else if (command == "KEYS") {
+          // assume that "*" is passed in.
+
+          // read the file
+          std::ifstream is(dir + "/" + dbfilename);
+
+          // identify keys segment
+
+          // skip header section
+          char header[9];
+          is.read(header, 9);
+          std::unordered_map<std::string, std::string> keyValue;
+
+          // process segments
+          while (true) {
+            uint8_t opcode = readByte(is);
+
+            // metadata section
+            if (opcode == 0xFA) {
+              int length = readLength(is);
+              char name[length];
+              is.read(name, length);
+
+              length = readLength(is);
+              char value[length];
+              is.read(value, length);
+            } else if (opcode == 0xFE) {
+              int length = readLength(is);
+              char index[length];
+              is.read(index, length);
+            } else if (opcode == 0xFB) {
+              int length = readLength(is);
+              char keyValueHashSize[length];
+              is.read(keyValueHashSize, length);
+
+              length = readLength(is);
+              char expiryHash[length];
+              is.read(expiryHash, length);
+            } else if (opcode == 0x00) {
+              int length = readLength(is);
+              char *keyBuffer;
+              is.read(keyBuffer, length);
+
+              length = readLength(is);
+              char *valBuffer;
+              is.read(valBuffer, length);
+
+              std::string key = keyBuffer;
+              std::string val = valBuffer;
+              keyValue[key] = val;
+            } // else if (opcode == 0xFC) {
+              //
+            //}
+          }
+
+          // pull that out
+          response = "*" + std::to_string(keyValue.size()) + "\r\n";
+
+          for (auto elem : keyValue) {
+            std::string key = elem.first;
+            response +=
+                "$" + std::to_string(key.size()) + "\r\n" + key + "\r\n";
           }
         }
       }
