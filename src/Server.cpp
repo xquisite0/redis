@@ -33,7 +33,7 @@ int readLength(std::ifstream &is) {
   uint8_t firstByte = readByte(is);
   std::cout << "\n First Byte: " << std::to_string(firstByte) << "\n";
 
-  uint8_t flag = firstByte >> 6;
+  uint8_t flag = (firstByte & 0xC0) >> 6;
   uint8_t value = firstByte & 0x3F;
   std::cout << "\n Flag & Value: " << std::to_string(flag) << " "
             << std::to_string(value) << "\n";
