@@ -31,7 +31,7 @@ static uint8_t readByte(std::ifstream &is) {
   return static_cast<uint8_t>(byte);
 }
 
-int readLength(std::ifstream &is) {
+int readLength(std::ifstream &is, bool &isValue) {
   uint8_t firstByte = readByte(is);
   std::cout << "\n First Byte: " << std::to_string(firstByte) << "\n";
 
@@ -193,36 +193,48 @@ void handleClient(int client_fd, const std::string &dir,
             std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
             // metadata section
             if (opcode == 0xFA) {
-              int length = readLength(is);
+              bool isValue = false;
+              int length = readLength(is, isValue);
               std::cout << "\n Metadata Name Length: " << length << "\n";
               char name[length];
               is.read(name, length);
               std::cout << "\nMetadata Name: " << name << "\n";
 
-              length = readLength(is);
+              isValue = false;
+              length = readLength(is, isValue);
               std::cout << "\n Metadata Value Length: " << length << "\n";
-              char value[length];
-              is.read(value, length);
+              std::string value;
+              if (isValue) {
+                value = length;
+              } else {
+                is.read(&value[0], length);
+              }
               std::cout << "\nMetadata Value: " << value << "\n";
             } else if (opcode == 0xFE) {
-              int length = readLength(is);
+              bool isValue = false;
+              int length = readLength(is, isValue);
               char index[length];
               is.read(index, length);
             } else if (opcode == 0xFB) {
-              int length = readLength(is);
+              bool isValue = false;
+              int length = readLength(is, isValue);
               char keyValueHashSize[length];
               is.read(keyValueHashSize, length);
 
-              length = readLength(is);
+              isValue = false;
+              length = readLength(is, isValue);
               char expiryHash[length];
               is.read(expiryHash, length);
             } else if (opcode == 0x00) {
               std::cout << "\nThis ran!\n";
-              int length = readLength(is);
+
+              bool isValue = false;
+              int length = readLength(is, isValue);
               std::string key(length, '\0');
               is.read(&key[0], length);
 
-              length = readLength(is);
+              isValue = false;
+              length = readLength(is, isValue);
               std::string val(length, '\0');
               is.read(&val[0], length);
 
