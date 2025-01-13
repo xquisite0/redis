@@ -195,11 +195,13 @@ void handleClient(int client_fd, const std::string &dir,
               std::cout << "\n Metadata Name Length: " << length << "\n";
               char name[length];
               is.read(name, length);
+              std::cout << "\nMetadata Name: " << name << "\n";
 
               length = readLength(is);
               std::cout << "\n Metadata Value Length: " << length << "\n";
               char value[length];
               is.read(value, length);
+              std::cout << "\nMetadata Value: " << value << "\n";
             } else if (opcode == 0xFE) {
               int length = readLength(is);
               char index[length];
