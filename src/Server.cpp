@@ -168,7 +168,6 @@ void handleClient(int client_fd, const std::string &dir,
           }
         } else if (command == "keys") {
           // assume that "*" is passed in.
-          std::cout << "\nLINE 171\n";
 
           // read the file
           std::ifstream is(dir + "/" + dbfilename);
@@ -183,7 +182,7 @@ void handleClient(int client_fd, const std::string &dir,
           // process segments
           while (true) {
             uint8_t opcode = readByte(is);
-
+            std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
             // metadata section
             if (opcode == 0xFA) {
               int length = readLength(is);
