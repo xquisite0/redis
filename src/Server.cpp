@@ -205,6 +205,7 @@ void handleClient(int client_fd, const std::string &dir,
               char expiryHash[length];
               is.read(expiryHash, length);
             } else if (opcode == 0x00) {
+              std::cout << "\nThis ran!\n";
               int length = readLength(is);
               char *keyBuffer;
               is.read(keyBuffer, length);
@@ -216,9 +217,25 @@ void handleClient(int client_fd, const std::string &dir,
               std::string key = keyBuffer;
               std::string val = valBuffer;
               keyValue[key] = val;
-            } // else if (opcode == 0xFC) {
-              //
-            //}
+            } else if (opcode == 0xFC) {
+              unsigned long time = 0;
+              for (int i = 0; i < 8; i++) {
+                uint8_t byte = readByte(is);
+                time <<= 8;
+                time |= byte;
+              }
+            } else if (opcode == 0xFD) {
+              unsigned int time = 0;
+              for (int i = 0; i < 4; i++) {
+                uint8_t byte = readByte(is);
+                time <<= 8;
+                time |= byte;
+              }
+            } else if (opcode == 0xFF) {
+              char checksum[8];
+              readBytes(is, checksum, 8);
+              break;
+            }
           }
 
           // pull that out
