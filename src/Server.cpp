@@ -166,7 +166,7 @@ void handleClient(int client_fd, const std::string &dir,
                          dbfilename + "\r\n";
             }
           }
-        } else if (command == "KEYS") {
+        } else if (command == "keys") {
           // assume that "*" is passed in.
           std::cout << "\nLINE 171\n";
 
