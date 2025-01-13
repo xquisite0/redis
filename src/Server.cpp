@@ -182,7 +182,7 @@ void handleClient(int client_fd, const std::string &dir,
           is.read(header, 9);
           std::unordered_map<std::string, std::string> keyValue;
 
-          int maxTimes = 20;
+          int maxTimes = 5;
           // process segments
           while (true) {
             if (!maxTimes--)
