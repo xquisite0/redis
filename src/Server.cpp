@@ -25,7 +25,9 @@ static void readBytes(std::ifstream &is, char *buffer, int length) {
 
 static uint8_t readByte(std::ifstream &is) {
   char byte;
-  is.read(&byte, 1);
+  if (!is.read(&byte, 1)) {
+    throw std::runtime_error("Unexpected EOF when reading RDB file");
+  }
   return static_cast<uint8_t>(byte);
 }
 
