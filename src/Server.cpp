@@ -168,6 +168,7 @@ void handleClient(int client_fd, const std::string &dir,
           }
         } else if (command == "KEYS") {
           // assume that "*" is passed in.
+          std::cout << "\nLINE 171\n";
 
           // read the file
           std::ifstream is(dir + "/" + dbfilename);
