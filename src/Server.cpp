@@ -34,6 +34,7 @@ int readLength(std::ifstream &is) {
 
   uint8_t flag = firstByte >> 6;
   uint8_t value = firstByte | 0x3F;
+  std::cout << "\n Flag & Value: " << flag << " " << value << "\n";
 
   if (flag == 0) {
     return value;
