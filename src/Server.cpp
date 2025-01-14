@@ -252,6 +252,8 @@ void handleClient(int client_fd, const std::string &dir,
             }
           }
 
+          std::cout << "Second Parameter val: " << message.elements[1].value
+                    << "\n";
           if (strcasecmp(message.elements[1].value.c_str(), "*") == 0) {
             // pull that out
             response = "*" + std::to_string(keyValue.size()) + "\r\n";
