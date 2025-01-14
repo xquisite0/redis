@@ -210,19 +210,13 @@ void handleClient(int client_fd, const std::string &dir,
               std::cout << "\nMetadata Value: " << value << "\n";
             } else if (opcode == 0xFE) {
               bool isValue = false;
-              int length = readLength(is, isValue);
-              char index[length];
-              is.read(index, length);
+              int databaseIndex = readLength(is, isValue);
             } else if (opcode == 0xFB) {
               bool isValue = false;
-              int length = readLength(is, isValue);
-              char keyValueHashSize[length];
-              is.read(keyValueHashSize, length);
+              int keyValueHashSize = readLength(is, isValue);
 
               isValue = false;
-              length = readLength(is, isValue);
-              char expiryHash[length];
-              is.read(expiryHash, length);
+              int expiryHashSize = readLength(is, isValue);
             } else if (opcode == 0x00) {
               std::cout << "\nThis ran!\n";
 
