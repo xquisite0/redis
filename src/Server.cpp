@@ -263,6 +263,7 @@ void handleClient(int client_fd, const std::string &dir,
             }
           } else {
             std::string key = message.elements[1].value;
+            std::cout << "THIS RAN";
 
             std::string val = keyValue[key];
 
