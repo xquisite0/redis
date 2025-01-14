@@ -218,7 +218,7 @@ void handleClient(int client_fd, const std::string &dir,
               isValue = false;
               int expiryHashSize = readLength(is, isValue);
             } else if (opcode == 0x00) {
-              std::cout << "\nThis ran!\n";
+              // std::cout << "\nThis ran!\n";
 
               bool isValue = false;
               int length = readLength(is, isValue);
@@ -252,13 +252,21 @@ void handleClient(int client_fd, const std::string &dir,
             }
           }
 
-          // pull that out
-          response = "*" + std::to_string(keyValue.size()) + "\r\n";
+          if (strcasecmp(message.elements[1].value.c_str(), "*") == 0) {
+            // pull that out
+            response = "*" + std::to_string(keyValue.size()) + "\r\n";
 
-          for (auto elem : keyValue) {
-            std::string key = elem.first;
-            response +=
-                "$" + std::to_string(key.size()) + "\r\n" + key + "\r\n";
+            for (auto elem : keyValue) {
+              std::string key = elem.first;
+              response +=
+                  "$" + std::to_string(key.size()) + "\r\n" + key + "\r\n";
+            }
+          } else {
+            std::string key = message.elements[1].value;
+
+            std::string val = keyValue[key];
+
+            response = "$" + std::to_string(val.size()) + "\r\n" + val + "\r\n";
           }
         }
       }
