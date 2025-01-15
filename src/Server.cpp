@@ -73,6 +73,9 @@ int readLength(std::ifstream &is, bool &isValue) {
 
 void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
               std::string dir, std::string dbfilename) {
+
+  if (dir == "" && dbfilename == "")
+    return;
   // read the file
   std::ifstream is(dir + "/" + dbfilename);
 
