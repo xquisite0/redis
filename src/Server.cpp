@@ -71,6 +71,86 @@ int readLength(std::ifstream &is, bool &isValue) {
   return -1;
 }
 
+void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
+              std::string dir, std::string dbfilename) {
+  // read the file
+  std::ifstream is(dir + "/" + dbfilename);
+
+  // identify keys segment
+
+  // skip header section
+  char header[9];
+  is.read(header, 9);
+  // std::unordered_map<std::string, std::string> keyValue;
+
+  // process segments
+  while (true) {
+    uint8_t opcode = readByte(is);
+    std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
+    // metadata section
+    if (opcode == 0xFA) {
+      bool isValue = false;
+      int length = readLength(is, isValue);
+      std::cout << "\n Metadata Name Length: " << length << "\n";
+      char name[length];
+      is.read(name, length);
+      std::cout << "\nMetadata Name: " << name << "\n";
+
+      isValue = false;
+      length = readLength(is, isValue);
+      std::cout << "\n Metadata Value Length: " << length << "\n";
+      std::string value;
+      if (isValue) {
+        value = length;
+      } else {
+        is.read(&value[0], length);
+      }
+      std::cout << "\nMetadata Value: " << value << "\n";
+    } else if (opcode == 0xFE) {
+      bool isValue = false;
+      int databaseIndex = readLength(is, isValue);
+    } else if (opcode == 0xFB) {
+      bool isValue = false;
+      int keyValueHashSize = readLength(is, isValue);
+
+      isValue = false;
+      int expiryHashSize = readLength(is, isValue);
+    } else if (opcode == 0x00) {
+      // std::cout << "\nThis ran!\n";
+
+      bool isValue = false;
+      int length = readLength(is, isValue);
+      std::string key(length, '\0');
+      is.read(&key[0], length);
+
+      isValue = false;
+      length = readLength(is, isValue);
+      std::string val(length, '\0');
+      is.read(&val[0], length);
+
+      keyValue[key] = val;
+    } else if (opcode == 0xFC) {
+      unsigned long time = 0;
+      for (int i = 0; i < 8; i++) {
+        uint8_t byte = readByte(is);
+        time <<= 8;
+        time |= byte;
+      }
+    } else if (opcode == 0xFD) {
+      unsigned int time = 0;
+      for (int i = 0; i < 4; i++) {
+        uint8_t byte = readByte(is);
+        time <<= 8;
+        time |= byte;
+      }
+    } else if (opcode == 0xFF) {
+      char checksum[8];
+      readBytes(is, checksum, 8);
+      break;
+    }
+  }
+}
+
 void handleClient(int client_fd, const std::string &dir,
                   const std::string &dbfilename) {
   std::unordered_map<std::string, std::string> keyValue;
@@ -121,6 +201,7 @@ void handleClient(int client_fd, const std::string &dir,
           }
 
         } else if (command == "get") {
+          parseRDB(keyValue, dir, dbfilename);
           bool valid = true;
 
           // key has not been set
@@ -128,7 +209,7 @@ void handleClient(int client_fd, const std::string &dir,
             response = "$-1\r\n";
             valid = false;
           }
-          // key has expired
+          // check for expiry
           if (keyStartExpiry.find(message.elements[1].value) !=
               keyStartExpiry.end()) {
             auto get_time = std::chrono::high_resolution_clock::now();
@@ -174,86 +255,9 @@ void handleClient(int client_fd, const std::string &dir,
           }
         } else if (command == "keys") {
           // assume that "*" is passed in.
-
-          // read the file
-          std::ifstream is(dir + "/" + dbfilename);
-
-          // identify keys segment
-
-          // skip header section
-          char header[9];
-          is.read(header, 9);
-          std::unordered_map<std::string, std::string> keyValue;
-
-          // process segments
-          while (true) {
-            uint8_t opcode = readByte(is);
-            std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
-            // metadata section
-            if (opcode == 0xFA) {
-              bool isValue = false;
-              int length = readLength(is, isValue);
-              std::cout << "\n Metadata Name Length: " << length << "\n";
-              char name[length];
-              is.read(name, length);
-              std::cout << "\nMetadata Name: " << name << "\n";
-
-              isValue = false;
-              length = readLength(is, isValue);
-              std::cout << "\n Metadata Value Length: " << length << "\n";
-              std::string value;
-              if (isValue) {
-                value = length;
-              } else {
-                is.read(&value[0], length);
-              }
-              std::cout << "\nMetadata Value: " << value << "\n";
-            } else if (opcode == 0xFE) {
-              bool isValue = false;
-              int databaseIndex = readLength(is, isValue);
-            } else if (opcode == 0xFB) {
-              bool isValue = false;
-              int keyValueHashSize = readLength(is, isValue);
-
-              isValue = false;
-              int expiryHashSize = readLength(is, isValue);
-            } else if (opcode == 0x00) {
-              // std::cout << "\nThis ran!\n";
-
-              bool isValue = false;
-              int length = readLength(is, isValue);
-              std::string key(length, '\0');
-              is.read(&key[0], length);
-
-              isValue = false;
-              length = readLength(is, isValue);
-              std::string val(length, '\0');
-              is.read(&val[0], length);
-
-              keyValue[key] = val;
-            } else if (opcode == 0xFC) {
-              unsigned long time = 0;
-              for (int i = 0; i < 8; i++) {
-                uint8_t byte = readByte(is);
-                time <<= 8;
-                time |= byte;
-              }
-            } else if (opcode == 0xFD) {
-              unsigned int time = 0;
-              for (int i = 0; i < 4; i++) {
-                uint8_t byte = readByte(is);
-                time <<= 8;
-                time |= byte;
-              }
-            } else if (opcode == 0xFF) {
-              char checksum[8];
-              readBytes(is, checksum, 8);
-              break;
-            }
-          }
-
-          std::cout << "Second Parameter val: " << message.elements[1].value
-                    << "\n";
+          parseRDB(keyValue, dir, dbfilename);
+          // std::cout << "Second Parameter val: " << message.elements[1].value
+          //           << "\n";
           if (strcasecmp(message.elements[1].value.c_str(), "*") == 0) {
             // pull that out
             response = "*" + std::to_string(keyValue.size()) + "\r\n";
@@ -263,13 +267,6 @@ void handleClient(int client_fd, const std::string &dir,
               response +=
                   "$" + std::to_string(key.size()) + "\r\n" + key + "\r\n";
             }
-          } else {
-            std::string key = message.elements[1].value;
-            std::cout << "THIS RAN";
-
-            std::string val = keyValue[key];
-
-            response = "$" + std::to_string(val.size()) + "\r\n" + val + "\r\n";
           }
         }
       }
