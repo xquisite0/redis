@@ -141,12 +141,15 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
         expirySet = false;
       }
     } else if (opcode == 0xFC) {
+      std::cout << "\n\n";
       unsigned long time = 0;
       for (int i = 0; i < 8; i++) {
         uint8_t byte = readByte(is);
+        std::cout << std::hex << byte << "\n";
         time <<= 8;
         time |= byte;
       }
+      std::cout << "\n\n";
 
       // auto set_time = std::chrono::high_resolution_clock::now();
 
