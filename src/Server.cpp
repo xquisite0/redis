@@ -87,7 +87,8 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
   is.read(header, 9);
   // std::unordered_map<std::string, std::string> keyValue;
 
-  long long expiryTimestamp = -1;
+  bool expirySet = false;
+  unsigned long expiryTimestamp = -1;
   // process segments
   while (true) {
     uint8_t opcode = readByte(is);
@@ -137,7 +138,7 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
 
       if (expiryTimestamp != -1) {
         keyStartExpiry[key] = expiryTimestamp;
-        expiryTimestamp = -1;
+        expirySet = false;
       }
     } else if (opcode == 0xFC) {
       unsigned long time = 0;
@@ -152,6 +153,7 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
       // keyStartExpiry[message.elements[1].value] =
       // std::make_pair(set_time, stol(message.elements[4].value));
       expiryTimestamp = time;
+      expirySet = true;
     } else if (opcode == 0xFD) {
       unsigned int time = 0;
       for (int i = 0; i < 4; i++) {
@@ -160,6 +162,7 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
         time |= byte;
       }
       expiryTimestamp = time * 1000;
+      expirySet = true;
     } else if (opcode == 0xFF) {
       char checksum[8];
       readBytes(is, checksum, 8);
