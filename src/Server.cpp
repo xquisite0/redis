@@ -159,7 +159,7 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
     } else if (opcode == 0xFD) {
       unsigned int time = 0;
       for (int i = 0; i < 4; i++) {
-        uint8_t byte = readByte(is);
+        long long byte = readByte(is);
         // time <<= 8;
         // time |= byte;
         time |= (byte << (8 * i));
