@@ -145,7 +145,7 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
       unsigned long time = 0;
       for (int i = 0; i < 8; i++) {
         uint8_t byte = readByte(is);
-        std::cout << std::to_string(byte) << " " << std::endl;
+        std::cout << std::to_string(byte) << " ";
         time <<= 8;
         time |= byte;
       }
