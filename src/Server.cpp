@@ -236,6 +236,7 @@ void handleClient(int client_fd, const std::string &dir,
           // check for expiry
           if (keyStartExpiry.find(message.elements[1].value) !=
               keyStartExpiry.end()) {
+            std::cout << "\n\nThis element has an expiry date set\n\n";
             auto now = std::chrono::system_clock::now();
 
             // Convert to milliseconds since the Unix epoch
