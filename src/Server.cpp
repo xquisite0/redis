@@ -226,8 +226,6 @@ void handleClient(int client_fd, const std::string &dir,
           }
 
         } else if (command == "get") {
-          std::cout << "\ndir: " << dir << "\n\ndbfilename: " << dbfilename
-                    << "\n";
           bool valid = true;
 
           // key has not been set
