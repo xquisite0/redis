@@ -71,9 +71,10 @@ int readLength(std::ifstream &is, bool &isValue) {
   return -1;
 }
 
-void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
-              std::unordered_map<std::string, long long> &keyStartExpiry,
-              std::string dir, std::string dbfilename) {
+void parseRDB(
+    std::unordered_map<std::string, std::string> &keyValue,
+    std::unordered_map<std::string, unsigned long long> &keyStartExpiry,
+    std::string dir, std::string dbfilename) {
 
   if (dir == "" && dbfilename == "")
     return;
@@ -88,11 +89,11 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
   // std::unordered_map<std::string, std::string> keyValue;
 
   bool expirySet = false;
-  unsigned long expiryTimestamp = -1;
+  unsigned long long expiryTimestamp = -1;
   // process segments
   while (true) {
     uint8_t opcode = readByte(is);
-    std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
+    // std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
     // metadata section
     if (opcode == 0xFA) {
       bool isValue = false;
@@ -142,9 +143,9 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
       }
     } else if (opcode == 0xFC) {
       std::cout << "\n\n";
-      unsigned long time = 0;
+      unsigned long long time = 0;
       for (int i = 0; i < 8; i++) {
-        uint8_t byte = readByte(is);
+        unsigned long long byte = readByte(is);
         time |= (byte << (8 * i));
         // time |= byte;
       }
@@ -157,9 +158,9 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
       expiryTimestamp = time;
       expirySet = true;
     } else if (opcode == 0xFD) {
-      unsigned int time = 0;
+      unsigned long long time = 0;
       for (int i = 0; i < 4; i++) {
-        long long byte = readByte(is);
+        unsigned long long byte = readByte(is);
         // time <<= 8;
         // time |= byte;
         time |= (byte << (8 * i));
@@ -177,7 +178,7 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
 void handleClient(int client_fd, const std::string &dir,
                   const std::string &dbfilename) {
   std::unordered_map<std::string, std::string> keyValue;
-  std::unordered_map<std::string, long long> keyStartExpiry;
+  std::unordered_map<std::string, unsigned long long> keyStartExpiry;
 
   // restore state of Redis with persistence.
   parseRDB(keyValue, keyStartExpiry, dir, dbfilename);
@@ -264,7 +265,7 @@ void handleClient(int client_fd, const std::string &dir,
                     now.time_since_epoch());
 
             // Get the Unix time in milliseconds
-            long long get_time = duration.count();
+            unsigned long long get_time = duration.count();
             // long long set_time =
             // keyStartExpiry[message.elements[1].value].first;
 
@@ -280,7 +281,7 @@ void handleClient(int client_fd, const std::string &dir,
             // int duration = difftime(get_time, set_time); // in seconds
             // std::cout << "\nDuration: " << duration.count()
             //           << "\nExpiry: " << expiry << "\n";
-            long long expiryTimestamp =
+            unsigned long long expiryTimestamp =
                 keyStartExpiry[message.elements[1].value];
             if (get_time > expiryTimestamp) {
               response = "$-1\r\n";
