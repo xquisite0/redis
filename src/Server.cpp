@@ -85,9 +85,9 @@ void parseRDB(
 
   // skip header section
   char header[9];
-  std::cout << "\n\nReading Header...\n\n";
+  // std::cout << "\n\nReading Header...\n\n";
   is.read(header, 9);
-  std::cout << "\n\nRead header!\n\n";
+  // std::cout << "\n\nRead header!\n\n";
   // std::unordered_map<std::string, std::string> keyValue;
 
   bool expirySet = false;
@@ -95,7 +95,7 @@ void parseRDB(
   // process segments
   while (true) {
     uint8_t opcode = readByte(is);
-    // std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
+    std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
     // metadata section
     if (opcode == 0xFA) {
       bool isValue = false;
