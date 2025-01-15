@@ -80,16 +80,19 @@ void parseRDB(
     return;
   // read the file
   std::ifstream is(dir + "/" + dbfilename);
+  if (!is.is_open()) {
+    std::cerr << "Error: File could not be opened!" << std::endl;
+    return;
+  }
 
   // identify keys segment
 
   // skip header section
-  // char header[9];
-  std::string header;
+  char header[9];
   std::cout << "\n\nReading Header...\n\n";
-  is.read(&header[0], 9);
+  is.read(header, 9);
   std::cout << "\n\nRead header!\n\n";
-  std::cout << header << "\n";
+  // std::cout << header << "\n";
   // std::unordered_map<std::string, std::string> keyValue;
 
   bool expirySet = false;
