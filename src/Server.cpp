@@ -201,6 +201,8 @@ void handleClient(int client_fd, const std::string &dir,
           }
 
         } else if (command == "get") {
+          std::cout << "\ndir: " << dir << "\n\ndbfilename: " << dbfilename
+                    << "\n";
           parseRDB(keyValue, dir, dbfilename);
           bool valid = true;
 
