@@ -94,7 +94,9 @@ void parseRDB(
   unsigned long long expiryTimestamp = -1;
   // process segments
   while (true) {
+    std::cout << "\n\nReading opcode: \n\n";
     uint8_t opcode = readByte(is);
+    std::cout << "\n\nRead opcode!\n\n";
     std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
     // metadata section
     if (opcode == 0xFA) {
