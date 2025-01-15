@@ -179,6 +179,15 @@ void handleClient(int client_fd, const std::string &dir,
   for (const auto &[key, value] : keyStartExpiry) {
     std::cout << key << ": " << value << std::endl;
   }
+  auto now = std::chrono::system_clock::now();
+
+  // Convert to milliseconds since the Unix epoch
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+      now.time_since_epoch());
+
+  // Get the Unix time in milliseconds
+  long long unix_time_ms = duration.count();
+  std::cout << "\n\n Time Now: " << unix_time_ms << std::endl;
 
   char buffer[1024];
   while (true) {
