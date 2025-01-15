@@ -145,9 +145,8 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
       unsigned long time = 0;
       for (int i = 0; i < 8; i++) {
         uint8_t byte = readByte(is);
-        std::cout << std::hex << int(byte) << " ";
-        time <<= 8;
-        time |= byte;
+        time |= (byte << (8 * i));
+        // time |= byte;
       }
       std::cout << "\n\n";
 
@@ -161,8 +160,9 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
       unsigned int time = 0;
       for (int i = 0; i < 4; i++) {
         uint8_t byte = readByte(is);
-        time <<= 8;
-        time |= byte;
+        // time <<= 8;
+        // time |= byte;
+        time |= (byte << (8 * i));
       }
       expiryTimestamp = time * 1000;
       expirySet = true;
