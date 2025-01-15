@@ -86,26 +86,26 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
   // process segments
   while (true) {
     uint8_t opcode = readByte(is);
-    std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
+    // std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
     // metadata section
     if (opcode == 0xFA) {
       bool isValue = false;
       int length = readLength(is, isValue);
-      std::cout << "\n Metadata Name Length: " << length << "\n";
+      // std::cout << "\n Metadata Name Length: " << length << "\n";
       char name[length];
       is.read(name, length);
-      std::cout << "\nMetadata Name: " << name << "\n";
+      // std::cout << "\nMetadata Name: " << name << "\n";
 
       isValue = false;
       length = readLength(is, isValue);
-      std::cout << "\n Metadata Value Length: " << length << "\n";
+      // std::cout << "\n Metadata Value Length: " << length << "\n";
       std::string value;
       if (isValue) {
         value = length;
       } else {
         is.read(&value[0], length);
       }
-      std::cout << "\nMetadata Value: " << value << "\n";
+      // std::cout << "\nMetadata Value: " << value << "\n";
     } else if (opcode == 0xFE) {
       bool isValue = false;
       int databaseIndex = readLength(is, isValue);
