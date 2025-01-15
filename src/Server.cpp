@@ -91,7 +91,7 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
   // process segments
   while (true) {
     uint8_t opcode = readByte(is);
-    // std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
+    std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
     // metadata section
     if (opcode == 0xFA) {
       bool isValue = false;
@@ -236,7 +236,7 @@ void handleClient(int client_fd, const std::string &dir,
           // check for expiry
           if (keyStartExpiry.find(message.elements[1].value) !=
               keyStartExpiry.end()) {
-            std::cout << "\n\nThis element has an expiry date set\n\n";
+            // std::cout << "\n\nThis element has an expiry date set\n\n";
             auto now = std::chrono::system_clock::now();
 
             // Convert to milliseconds since the Unix epoch
