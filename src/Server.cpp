@@ -85,9 +85,10 @@ void parseRDB(
 
   // skip header section
   char header[9];
-  // std::cout << "\n\nReading Header...\n\n";
+  std::cout << "\n\nReading Header...\n\n";
   is.read(header, 9);
-  // std::cout << "\n\nRead header!\n\n";
+  std::cout << "\n\nRead header!\n\n";
+  std::cout << header << "\n";
   // std::unordered_map<std::string, std::string> keyValue;
 
   bool expirySet = false;
