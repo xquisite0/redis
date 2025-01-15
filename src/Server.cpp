@@ -173,12 +173,12 @@ void handleClient(int client_fd, const std::string &dir,
   std::unordered_map<std::string, std::string> keyValue;
   std::unordered_map<std::string, long long> keyStartExpiry;
 
+  // restore state of Redis with persistence.
+  parseRDB(keyValue, keyStartExpiry, dir, dbfilename);
+
   for (const auto &[key, value] : keyStartExpiry) {
     std::cout << key << ": " << value << std::endl;
   }
-
-  // restore state of Redis with persistence.
-  parseRDB(keyValue, keyStartExpiry, dir, dbfilename);
 
   char buffer[1024];
   while (true) {
