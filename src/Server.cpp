@@ -72,6 +72,7 @@ int readLength(std::ifstream &is, bool &isValue) {
 }
 
 void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
+              std::unordered_map<std::string, long long> keyStartExpiry,
               std::string dir, std::string dbfilename) {
 
   if (dir == "" && dbfilename == "")
@@ -86,6 +87,7 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
   is.read(header, 9);
   // std::unordered_map<std::string, std::string> keyValue;
 
+  long long expiryTimestamp = -1;
   // process segments
   while (true) {
     uint8_t opcode = readByte(is);
@@ -132,6 +134,11 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
       is.read(&val[0], length);
 
       keyValue[key] = val;
+
+      if (expiryTimestamp != -1) {
+        keyStartExpiry[key] = expiryTimestamp;
+        expiryTimestamp = -1;
+      }
     } else if (opcode == 0xFC) {
       unsigned long time = 0;
       for (int i = 0; i < 8; i++) {
@@ -139,6 +146,12 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
         time <<= 8;
         time |= byte;
       }
+
+      // auto set_time = std::chrono::high_resolution_clock::now();
+
+      // keyStartExpiry[message.elements[1].value] =
+      // std::make_pair(set_time, stol(message.elements[4].value));
+      expiryTimestamp = time;
     } else if (opcode == 0xFD) {
       unsigned int time = 0;
       for (int i = 0; i < 4; i++) {
@@ -146,6 +159,7 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
         time <<= 8;
         time |= byte;
       }
+      expiryTimestamp = time * 1000;
     } else if (opcode == 0xFF) {
       char checksum[8];
       readBytes(is, checksum, 8);
@@ -157,11 +171,10 @@ void parseRDB(std::unordered_map<std::string, std::string> &keyValue,
 void handleClient(int client_fd, const std::string &dir,
                   const std::string &dbfilename) {
   std::unordered_map<std::string, std::string> keyValue;
-  std::unordered_map<
-      std::string,
-      std::pair<std::chrono::time_point<std::chrono::high_resolution_clock>,
-                long>>
-      keyStartExpiry;
+  std::unordered_map<std::string, long long> keyStartExpiry;
+
+  // restore state of Redis with persistence.
+  parseRDB(keyValue, keyStartExpiry, dir, dbfilename);
 
   char buffer[1024];
   while (true) {
@@ -196,17 +209,25 @@ void handleClient(int client_fd, const std::string &dir,
 
           if (message.elements.size() > 2) {
             if (message.elements[3].value == "px") {
-              auto set_time = std::chrono::high_resolution_clock::now();
+              auto now = std::chrono::system_clock::now();
 
-              keyStartExpiry[message.elements[1].value] =
-                  std::make_pair(set_time, stol(message.elements[4].value));
+              // Convert to milliseconds since the Unix epoch
+              auto duration =
+                  std::chrono::duration_cast<std::chrono::milliseconds>(
+                      now.time_since_epoch());
+
+              // Get the Unix time in milliseconds
+              long long unix_time_ms = duration.count();
+              long long expiryTimestamp =
+                  unix_time_ms + stoll(message.elements[4].value);
+
+              keyStartExpiry[message.elements[1].value] = expiryTimestamp;
             }
           }
 
         } else if (command == "get") {
           std::cout << "\ndir: " << dir << "\n\ndbfilename: " << dbfilename
                     << "\n";
-          parseRDB(keyValue, dir, dbfilename);
           bool valid = true;
 
           // key has not been set
@@ -217,21 +238,33 @@ void handleClient(int client_fd, const std::string &dir,
           // check for expiry
           if (keyStartExpiry.find(message.elements[1].value) !=
               keyStartExpiry.end()) {
-            auto get_time = std::chrono::high_resolution_clock::now();
-            auto set_time = keyStartExpiry[message.elements[1].value].first;
-            int expiry = keyStartExpiry[message.elements[1].value].second;
+            auto now = std::chrono::system_clock::now();
+
+            // Convert to milliseconds since the Unix epoch
+            auto duration =
+                std::chrono::duration_cast<std::chrono::milliseconds>(
+                    now.time_since_epoch());
+
+            // Get the Unix time in milliseconds
+            long long get_time = duration.count();
+            // long long set_time =
+            // keyStartExpiry[message.elements[1].value].first;
+
+            // int expiry = keyStartExpiry[message.elements[1].value].second;
 
             // std::cout << "\nget_time - set_time: " << get_time << " "
             // << set_time << "\n";
 
-            std::chrono::duration<double, std::milli> duration =
-                get_time - set_time;
+            // std::chrono::duration<double, std::milli> duration =
+            //     get_time - set_time;
 
             // double duration = (get_time - set_time).count();
             // int duration = difftime(get_time, set_time); // in seconds
-            std::cout << "\nDuration: " << duration.count()
-                      << "\nExpiry: " << expiry << "\n";
-            if (duration.count() > expiry) {
+            // std::cout << "\nDuration: " << duration.count()
+            //           << "\nExpiry: " << expiry << "\n";
+            long long expiryTimestamp =
+                keyStartExpiry[message.elements[1].value];
+            if (get_time > expiryTimestamp) {
               response = "$-1\r\n";
               valid = false;
             }
@@ -260,7 +293,6 @@ void handleClient(int client_fd, const std::string &dir,
           }
         } else if (command == "keys") {
           // assume that "*" is passed in.
-          parseRDB(keyValue, dir, dbfilename);
           // std::cout << "Second Parameter val: " << message.elements[1].value
           //           << "\n";
           if (strcasecmp(message.elements[1].value.c_str(), "*") == 0) {
