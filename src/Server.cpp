@@ -417,8 +417,8 @@ int main(int argc, char **argv) {
     std::string master_host_string = replicaof.substr(0, replicaof.find(' '));
     in_addr_t MASTER_HOST = inet_addr(master_host_string.c_str());
     int MASTER_PORT = stoi(replicaof.substr(replicaof.find(' ') + 1));
-    std::cout << "\nMASTER_HOST & PORT " << MASTER_HOST << " " << MASTER_PORT
-              << "\n";
+    std::cout << "\nMASTER_HOST & PORT " << master_host_string << " "
+              << MASTER_PORT << "\n";
 
     int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
 
