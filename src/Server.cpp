@@ -18,7 +18,7 @@
 #include <unordered_map>
 
 std::string master_replid = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
-std::string master_repl_offset = 0;
+int master_repl_offset = 0;
 
 static void readBytes(std::ifstream &is, char *buffer, int length) {
   if (!is.read(buffer, length)) {
