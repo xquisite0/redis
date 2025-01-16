@@ -341,11 +341,13 @@ void handleClient(int client_fd, const std::string &dir,
           // assume that the key is replication
 
           if (replicaof == "") {
+            // std::string offsetstd::to_string(master_repl_offset)
             response = "$" +
                        std::to_string(
                            6 + 40 + std::to_string(master_repl_offset).size()) +
                        "\r\nrole:master\r\nmaster_replid:" + master_replid +
-                       "\r\nmaster_repl_offset" + master_repl_offset + "\r\n";
+                       "\r\nmaster_repl_offset" +
+                       std::to_string(master_repl_offset) + "\r\n";
           } else {
             response = "$10\r\nrole:slave\r\n";
           }
