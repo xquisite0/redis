@@ -17,6 +17,9 @@
 #include <unistd.h>
 #include <unordered_map>
 
+std::string master_replid = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
+std::string master_repl_offset = 0;
+
 static void readBytes(std::ifstream &is, char *buffer, int length) {
   if (!is.read(buffer, length)) {
     throw std::runtime_error("Unexpected EOF when reading RDB file");
@@ -338,7 +341,11 @@ void handleClient(int client_fd, const std::string &dir,
           // assume that the key is replication
 
           if (replicaof == "") {
-            response = "$11\r\nrole:master\r\n";
+            response = "$" +
+                       std::to_string(6 + 40 +
+                                      std::string(master_repl_offset).size()) +
+                       "\r\nrole:master\r\nmaster_replid:" + master_replid +
+                       "\r\nmaster_repl_offset" + master_repl_offset + "\r\n";
           } else {
             response = "$10\r\nrole:slave\r\n";
           }
