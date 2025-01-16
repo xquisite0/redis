@@ -344,10 +344,10 @@ void handleClient(int client_fd, const std::string &dir,
             // std::string offsetstd::to_string(master_repl_offset)
             response =
                 "$" +
-                std::to_string(11 + 14 + 40 + 18 +
+                std::to_string(11 + 14 + 40 + 19 +
                                std::to_string(master_repl_offset).size()) +
                 "\r\nrole:master\r\nmaster_replid:" + master_replid +
-                "\r\nmaster_repl_offset" + std::to_string(master_repl_offset) +
+                "\r\nmaster_repl_offset:" + std::to_string(master_repl_offset) +
                 "\r\n";
           } else {
             response = "$10\r\nrole:slave\r\n";
