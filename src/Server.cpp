@@ -412,6 +412,24 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  // bind to master
+  if (replicaof != "") {
+    std::string MASTER_HOST = replicaof.substr(0, replicaof.find(' '));
+    int MASTER_PORT = stoi(replicaof.substr(replicaof.find(' ') + 1));
+
+    struct sockaddr_in master_addr;
+    master_addr.sin_family = AF_INET;
+    master_addr.sin_addr.s_addr = INADDR_ANY;
+    master_addr.sin_port = htons(MASTER_PORT);
+
+    connect(server_fd, (struct sockaddr *)&master_addr, sizeof(master_addr));
+
+    const char *message = "*1\r\n$4\r\nPING\r\n";
+    send(server_fd, message, strlen(message), 0);
+
+    close(server_fd);
+  }
+
   int connection_backlog = 5;
   if (listen(server_fd, connection_backlog) != 0) {
     std::cerr << "listen failed\n";
