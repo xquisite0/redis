@@ -417,8 +417,8 @@ int main(int argc, char **argv) {
     std::string master_host_string = replicaof.substr(0, replicaof.find(' '));
     in_addr_t MASTER_HOST = inet_addr(master_host_string.c_str());
     int MASTER_PORT = stoi(replicaof.substr(replicaof.find(' ') + 1));
-    // std::cout << "\nMASTER_HOST & PORT " << MASTER_HOST << " " << MASTER_PORT
-    // << "\n";
+    std::cout << "\nMASTER_HOST & PORT " << MASTER_HOST << " " << MASTER_PORT
+              << "\n";
 
     struct sockaddr_in master_addr;
     master_addr.sin_family = AF_INET;
@@ -426,6 +426,7 @@ int main(int argc, char **argv) {
     master_addr.sin_port = htons(MASTER_PORT);
 
     connect(server_fd, (struct sockaddr *)&master_addr, sizeof(master_addr));
+    std::cout << "\n\nReplica connected to Master\n\n";
 
     const char *message = "*1\r\n$4\r\nPING\r\n";
     send(server_fd, message, strlen(message), 0);
