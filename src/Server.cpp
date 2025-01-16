@@ -333,6 +333,10 @@ void handleClient(int client_fd, const std::string &dir,
                   "$" + std::to_string(key.size()) + "\r\n" + key + "\r\n";
             }
           }
+        } else if (command == "info") {
+          // assume that the key is replication
+
+          response = "$11\r\nrole:master\r\n";
         }
       }
     }
