@@ -421,16 +421,14 @@ int main(int argc, char **argv) {
               << MASTER_PORT << "\n";
 
     int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    std::cout << "Client Socket value: " << clientSocket << "\n";
 
     struct sockaddr_in master_addr;
     master_addr.sin_family = AF_INET;
     master_addr.sin_addr.s_addr = MASTER_HOST;
     master_addr.sin_port = htons(MASTER_PORT);
 
-    std::cout << "Connect Value"
-              << connect(clientSocket, (struct sockaddr *)&master_addr,
-                         sizeof(master_addr))
-              << "\n";
+    connect(clientSocket, (struct sockaddr *)&master_addr, sizeof(master_addr));
 
     const char *message = "*1\r\n$4\r\nPING\r\n";
     send(clientSocket, message, strlen(message), 0);
