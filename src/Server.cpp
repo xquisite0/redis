@@ -342,8 +342,8 @@ void handleClient(int client_fd, const std::string &dir,
 
           if (replicaof == "") {
             response = "$" +
-                       std::to_string(6 + 40 +
-                                      std::string(master_repl_offset).size()) +
+                       std::to_string(
+                           6 + 40 + std::to_string(master_repl_offset).size()) +
                        "\r\nrole:master\r\nmaster_replid:" + master_replid +
                        "\r\nmaster_repl_offset" + master_repl_offset + "\r\n";
           } else {
