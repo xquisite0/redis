@@ -421,7 +421,7 @@ int main(int argc, char **argv) {
               << MASTER_PORT << "\n";
 
     int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-    std::cout << "Client Socket value: " << clientSocket << "\n";
+    std::cout << "Client Socket value: " << server_fd << "\n";
 
     struct sockaddr_in master_addr;
     master_addr.sin_family = AF_INET;
