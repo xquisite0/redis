@@ -337,7 +337,7 @@ void handleClient(int client_fd, const std::string &dir,
         } else if (command == "info") {
           // assume that the key is replication
 
-          if (replicaof != "") {
+          if (replicaof == "") {
             response = "$11\r\nrole:master\r\n";
           } else {
             response = "$11\r\nrole:slave\r\n";
