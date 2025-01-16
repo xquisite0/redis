@@ -414,14 +414,15 @@ int main(int argc, char **argv) {
 
   // bind to master
   if (replicaof != "") {
-    std::string MASTER_HOST = replicaof.substr(0, replicaof.find(' '));
+    std::string master_host_string = replicaof.substr(0, replicaof.find(' '));
+    in_addr_t MASTER_HOST = inet_addr(master_host_string.c_str());
     int MASTER_PORT = stoi(replicaof.substr(replicaof.find(' ') + 1));
-    std::cout << "\nMASTER_HOST & PORT " << MASTER_HOST << " " << MASTER_PORT
-              << "\n";
+    // std::cout << "\nMASTER_HOST & PORT " << MASTER_HOST << " " << MASTER_PORT
+    // << "\n";
 
     struct sockaddr_in master_addr;
     master_addr.sin_family = AF_INET;
-    master_addr.sin_addr.s_addr = INADDR_ANY;
+    master_addr.sin_addr.s_addr = MASTER_HOST;
     master_addr.sin_port = htons(MASTER_PORT);
 
     connect(server_fd, (struct sockaddr *)&master_addr, sizeof(master_addr));
