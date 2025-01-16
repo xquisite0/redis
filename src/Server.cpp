@@ -346,7 +346,7 @@ void handleClient(int client_fd, const std::string &dir,
                 "role:master\r\nmaster_replid:" + master_replid +
                 "\r\nmaster_repl_offset:" + std::to_string(master_repl_offset);
             response = "$" + std::to_string(response_string.size()) + "\r\n" +
-                       response_string;
+                       response_string + "\r\n";
           } else {
             response = "$10\r\nrole:slave\r\n";
           }
