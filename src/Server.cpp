@@ -340,7 +340,7 @@ void handleClient(int client_fd, const std::string &dir,
           if (replicaof == "") {
             response = "$11\r\nrole:master\r\n";
           } else {
-            response = "$11\r\nrole:slave\r\n";
+            response = "$10\r\nrole:slave\r\n";
           }
         }
       }
