@@ -426,10 +426,10 @@ int main(int argc, char **argv) {
     master_addr.sin_port = htons(MASTER_PORT);
 
     connect(server_fd, (struct sockaddr *)&master_addr, sizeof(master_addr));
-    std::cout << "\n\nReplica connected to Master\n\n";
 
     const char *message = "*1\r\n$4\r\nPING\r\n";
     send(server_fd, message, strlen(message), 0);
+    std::cout << "\n\nReplica connected to Master\n\n";
 
     close(server_fd);
   }
