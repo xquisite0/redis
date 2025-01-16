@@ -420,18 +420,20 @@ int main(int argc, char **argv) {
     std::cout << "\nMASTER_HOST & PORT " << MASTER_HOST << " " << MASTER_PORT
               << "\n";
 
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+
     struct sockaddr_in master_addr;
     master_addr.sin_family = AF_INET;
     master_addr.sin_addr.s_addr = MASTER_HOST;
     master_addr.sin_port = htons(MASTER_PORT);
 
-    connect(server_fd, (struct sockaddr *)&master_addr, sizeof(master_addr));
+    connect(clientSocket, (struct sockaddr *)&master_addr, sizeof(master_addr));
 
     const char *message = "*1\r\n$4\r\nPING\r\n";
-    send(server_fd, message, strlen(message), 0);
+    send(clientSocket, message, strlen(message), 0);
     std::cout << "\n\nReplica connected to Master\n\n";
 
-    close(server_fd);
+    close(clientSocket);
   }
 
   int connection_backlog = 5;
