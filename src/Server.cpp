@@ -361,7 +361,7 @@ int main(int argc, char **argv) {
       dbfilename = argv[i + 1];
     }
     if (std::string(argv[i]) == "--port") {
-      port = stoi(std::string(argv[i]));
+      port = stoi(std::string(argv[i + 1]));
     }
   }
 
