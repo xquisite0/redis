@@ -416,6 +416,8 @@ int main(int argc, char **argv) {
   if (replicaof != "") {
     std::string MASTER_HOST = replicaof.substr(0, replicaof.find(' '));
     int MASTER_PORT = stoi(replicaof.substr(replicaof.find(' ') + 1));
+    std::cout << "\nMASTER_HOST & PORT " << MASTER_HOST << " " << MASTER_PORT
+              << "\n";
 
     struct sockaddr_in master_addr;
     master_addr.sin_family = AF_INET;
