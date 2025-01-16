@@ -342,13 +342,12 @@ void handleClient(int client_fd, const std::string &dir,
 
           if (replicaof == "") {
             // std::string offsetstd::to_string(master_repl_offset)
-            response =
-                "$" +
-                std::to_string(11 + 14 + 40 + 19 +
-                               std::to_string(master_repl_offset).size()) +
-                "\r\nrole:master\r\nmaster_replid:" + master_replid +
+            std::string response_string =
+                "role:master\r\nmaster_replid:" + master_replid +
                 "\r\nmaster_repl_offset:" + std::to_string(master_repl_offset) +
                 "\r\n";
+            response = "$" + std::to_string(response_string.size()) + "\r\n" +
+                       response_string;
           } else {
             response = "$10\r\nrole:slave\r\n";
           }
