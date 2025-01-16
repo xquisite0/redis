@@ -427,7 +427,10 @@ int main(int argc, char **argv) {
     master_addr.sin_addr.s_addr = MASTER_HOST;
     master_addr.sin_port = htons(MASTER_PORT);
 
-    connect(clientSocket, (struct sockaddr *)&master_addr, sizeof(master_addr));
+    std::cout << "Connect Value"
+              << connect(clientSocket, (struct sockaddr *)&master_addr,
+                         sizeof(master_addr))
+              << "\n";
 
     const char *message = "*1\r\n$4\r\nPING\r\n";
     send(clientSocket, message, strlen(message), 0);
