@@ -185,7 +185,8 @@ void parseRDB(
 }
 
 void handleClient(int client_fd, const std::string &dir,
-                  const std::string &dbfilename) {
+                  const std::string &dbfilename, int port,
+                  std::string replicaof) {
   std::unordered_map<std::string, std::string> keyValue;
   std::unordered_map<std::string, unsigned long long> keyStartExpiry;
 
@@ -336,7 +337,11 @@ void handleClient(int client_fd, const std::string &dir,
         } else if (command == "info") {
           // assume that the key is replication
 
-          response = "$11\r\nrole:master\r\n";
+          if (replicaof != "") {
+            response = "$11\r\nrole:master\r\n";
+          } else {
+            response = "$11\r\nrole:slave\r\n";
+          }
         }
       }
     }
@@ -356,6 +361,7 @@ int main(int argc, char **argv) {
   std::string dir = "";
   std::string dbfilename = "";
   int port = 6379;
+  std::string replicaof = "";
 
   for (int i = 1; i < argc; i++) {
     if (std::string(argv[i]) == "--dir") {
@@ -366,6 +372,9 @@ int main(int argc, char **argv) {
     }
     if (std::string(argv[i]) == "--port") {
       port = stoi(std::string(argv[i + 1]));
+    }
+    if (std::string(argv[i]) == "--replicaof") {
+      replicaof = std::string(argv[i + 1]);
     }
   }
 
@@ -418,7 +427,8 @@ int main(int argc, char **argv) {
                            (socklen_t *)&client_addr_len);
 
     if (client_fd >= 0) {
-      std::thread(handleClient, client_fd, dir, dbfilename).detach();
+      std::thread(handleClient, client_fd, dir, dbfilename, port, replicaof)
+          .detach();
     }
 
     std::cout << "Client connected\n" << client_fd;
