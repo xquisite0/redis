@@ -397,8 +397,7 @@ void handleClient(int client_fd, const std::string &dir,
             bytes.push_back(byte);
           }
 
-          response =
-              "$" + std::to_string(bytes.size()) + "\r\n" + bytes + "\r\n";
+          response = "$" + std::to_string(bytes.size()) + "\r\n" + bytes;
         }
       }
     }
