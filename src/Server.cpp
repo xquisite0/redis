@@ -20,6 +20,7 @@
 std::string master_replid = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 int master_repl_offset = 0;
 std::vector<int> replicaSockets;
+std::unordered_map<std::string, std::string> keyValue;
 
 static void readBytes(std::ifstream &is, char *buffer, int length) {
   if (!is.read(buffer, length)) {
@@ -214,7 +215,6 @@ std::string receiveResponse(int socketFd) {
 void handleClient(int client_fd, const std::string &dir,
                   const std::string &dbfilename, int port,
                   std::string replicaof) {
-  std::unordered_map<std::string, std::string> keyValue;
   std::unordered_map<std::string, unsigned long long> keyStartExpiry;
 
   // restore state of Redis with persistence.
