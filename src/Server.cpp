@@ -414,11 +414,13 @@ int main(int argc, char **argv) {
 
   // bind to master
   if (replicaof != "") {
-    // std::string master_host_string = replicaof.substr(0, replicaof.find('
-    // '));
-    std::string master_host_string = "127.0.0.1";
+    std::string master_host_string = replicaof.substr(0, replicaof.find(' '));
+    if (master_host_string == "localhost") {
+      master_host_string = "127.0.0.1";
+    }
     in_addr_t MASTER_HOST = inet_addr(master_host_string.c_str());
-    int MASTER_PORT = stoi(replicaof.substr(replicaof.find(' ') + 1));
+    std::string master_port_string = replicaof.substr(replicaof.find(' ') + 1);
+    int MASTER_PORT = stoi(master_port_string);
     std::cout << "\nMASTER_HOST & PORT " << master_host_string << " "
               << MASTER_PORT << "\n";
 
@@ -436,11 +438,23 @@ int main(int argc, char **argv) {
       close(clientSocket);
       return -1;
     }
-    std::cout << "\n\nReplica connected to Master\n\n";
+    // std::cout << "\n\nReplica connected to Master\n\n";
 
-    const char *message = "*1\r\n$4\r\nPING\r\n";
-    send(clientSocket, message, strlen(message), 0);
-    std::cout << "\n\nMessage sent to Master\n\n";
+    std::string message = "*1\r\n$4\r\nPING\r\n";
+
+    // Send PING message
+    send(clientSocket, message.c_str(), message.size(), 0);
+    // std::cout << "\n\nMessage sent to Master\n\n";
+
+    message = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$" +
+              std::to_string(master_port_string.size()) + "\r\n" +
+              master_port_string + "\r\n";
+
+    send(clientSocket, message.c_str(), message.size(), 0);
+
+    message = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
+
+    send(clientSocket, message.c_str(), message.size(), 0);
 
     close(clientSocket);
   }
