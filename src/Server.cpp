@@ -387,7 +387,7 @@ void handleClient(int client_fd, const std::string &dir,
               "732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0"
               "c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
 
-          response = "$" + std::to_string(emptyRDB.size() / 2) + "\r\n";
+          response = "$" + std::to_string(emptyRDB.size()) + "\r\n";
           response += emptyRDB;
         }
       }
