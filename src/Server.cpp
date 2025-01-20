@@ -484,6 +484,12 @@ int main(int argc, char **argv) {
 
     response = receiveResponse(clientSocket);
 
+    message = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
+
+    send(clientSocket, message.c_str(), message.size(), 0);
+
+    response = receiveResponse(clientSocket);
+
     close(clientSocket);
   }
 
