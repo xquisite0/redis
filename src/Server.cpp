@@ -187,6 +187,26 @@ void parseRDB(
   }
 }
 
+std::string receiveResponse(int socketFd) {
+  std::string response;
+  const size_t bufferSize = 1024; // Buffer size for receiving chunks of data
+  char buffer[bufferSize];
+
+  ssize_t bytesReceived;
+  while ((bytesReceived = recv(socketFd, buffer, sizeof(buffer) - 1, 0)) > 0) {
+    buffer[bytesReceived] = '\0'; // Null-terminate received data
+    response += buffer;           // Append to response string
+  }
+
+  if (bytesReceived == 0) {
+    std::cout << "Server closed the connection.\n";
+  } else if (bytesReceived < 0) {
+    std::cerr << "Error receiving data.\n";
+  }
+
+  return response;
+}
+
 void handleClient(int client_fd, const std::string &dir,
                   const std::string &dbfilename, int port,
                   std::string replicaof) {
@@ -446,6 +466,8 @@ int main(int argc, char **argv) {
     send(clientSocket, message.c_str(), message.size(), 0);
     // std::cout << "\n\nMessage sent to Master\n\n";
 
+    std::string response = receiveResponse(clientSocket);
+
     message = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$" +
               std::to_string(master_port_string.size()) + "\r\n" +
               master_port_string + "\r\n";
@@ -455,6 +477,8 @@ int main(int argc, char **argv) {
     message = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
 
     send(clientSocket, message.c_str(), message.size(), 0);
+
+    response = receiveResponse(clientSocket);
 
     close(clientSocket);
   }
