@@ -378,6 +378,17 @@ void handleClient(int client_fd, const std::string &dir,
         } else if (command == "psync") {
           response = "+FULLRESYNC " + master_replid + " " +
                      std::to_string(master_repl_offset) + "\r\n";
+
+          // send our RDB file for replica to sync to
+
+          // simulate with an empty RDB file
+          std::string emptyRDB =
+              "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469"
+              "732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0"
+              "c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
+
+          response = "$" + std::to_string(emptyRDB.size() / 2) + "\r\n";
+          response += emptyRDB;
         }
       }
     }
