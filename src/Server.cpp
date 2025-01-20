@@ -19,6 +19,7 @@
 
 std::string master_replid = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 int master_repl_offset = 0;
+std::vector<int> replicaSockets;
 
 static void readBytes(std::ifstream &is, char *buffer, int length) {
   if (!is.read(buffer, length)) {
@@ -241,6 +242,7 @@ void handleClient(int client_fd, const std::string &dir,
 
     ProtocolParser parser;
     RedisMessage message = parser.parse(buffer);
+
     std::string response;
 
     // Checking for ECHO command
@@ -260,6 +262,12 @@ void handleClient(int client_fd, const std::string &dir,
           response = "+PONG\r\n";
 
         } else if (command == "set") {
+
+          for (int fd : replicaSockets) {
+            send(fd, std::string(buffer).c_str(), std::string(buffer).size(),
+                 0);
+          }
+
           keyValue[message.elements[1].value] = message.elements[2].value;
           response = "+OK\r\n";
 
@@ -398,6 +406,8 @@ void handleClient(int client_fd, const std::string &dir,
           }
 
           response = "$" + std::to_string(bytes.size()) + "\r\n" + bytes;
+
+          replicaSockets.push_back(client_fd);
         }
       }
     }
