@@ -271,6 +271,8 @@ void handleClient(int client_fd, const std::string &dir,
                     << " with VALUE: " << message.elements[2].value
                     << " with replica: " << replicaof << "\n\n";
           keyValue[message.elements[1].value] = message.elements[2].value;
+
+          std::cout << "\ntest: " << keyValue["foo"] << "\n";
           response = "+OK\r\n";
 
           if (message.elements.size() > 2) {
