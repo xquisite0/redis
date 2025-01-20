@@ -231,7 +231,7 @@ void handleClient(int client_fd, const std::string &dir,
 
   // Get the Unix time in milliseconds
   long long unix_time_ms = duration.count();
-  std::cout << "\n\n Time Now: " << unix_time_ms << std::endl;
+  // std::cout << "\n\n Time Now: " << unix_time_ms << std::endl;
 
   char buffer[1024];
   while (true) {
@@ -295,6 +295,7 @@ void handleClient(int client_fd, const std::string &dir,
 
           // key has not been set
           if (keyValue.find(message.elements[1].value) == keyValue.end()) {
+            std::cout << "\n\nKEY HAS NOT BEEN SET\n\n";
             response = "$-1\r\n";
             valid = false;
           }
