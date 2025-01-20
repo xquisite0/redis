@@ -375,6 +375,9 @@ void handleClient(int client_fd, const std::string &dir,
           }
         } else if (command == "replconf") {
           response = "+OK\r\n";
+        } else if (command == "psync") {
+          response = "+FULLRESYNC " + master_replid + " " +
+                     std::to_string(master_repl_offset) + "\r\n";
         }
       }
     }
