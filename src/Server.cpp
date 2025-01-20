@@ -471,6 +471,7 @@ int main(int argc, char **argv) {
   }
 
   // bind to master
+  int clientSocket = -1;
   if (replicaof != "") {
     std::string master_host_string = replicaof.substr(0, replicaof.find(' '));
     if (master_host_string == "localhost") {
@@ -525,9 +526,9 @@ int main(int argc, char **argv) {
 
     response = receiveResponse(clientSocket);
 
-    handleClient(clientSocket, dir, dbfilename, port, replicaof);
-
-    close(clientSocket);
+    // handleClient(clientSocket, dir, dbfilename, port, replicaof);
+    std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof)
+        .detach();
   }
 
   int connection_backlog = 5;
@@ -560,6 +561,8 @@ int main(int argc, char **argv) {
     std::cout << "Client connected\n" << client_fd;
   }
 
+  if (clientSocket >= 0)
+    close(clientSocket);
   close(server_fd);
 
   return 0;
