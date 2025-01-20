@@ -264,6 +264,7 @@ void handleClient(int client_fd, const std::string &dir,
         } else if (command == "set") {
 
           for (int fd : replicaSockets) {
+            std::cout << "\nPROPAGATED\n";
             send(fd, std::string(buffer).c_str(), std::string(buffer).size(),
                  0);
           }
