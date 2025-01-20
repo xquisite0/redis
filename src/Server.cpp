@@ -373,6 +373,8 @@ void handleClient(int client_fd, const std::string &dir,
           } else {
             response = "$10\r\nrole:slave\r\n";
           }
+        } else if (command == "psync") {
+          response = "+OK\r\n";
         }
       }
     }
