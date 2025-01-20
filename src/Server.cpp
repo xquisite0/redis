@@ -479,7 +479,7 @@ int main(int argc, char **argv) {
 
     send(clientSocket, message.c_str(), message.size(), 0);
 
-    response = receiveResponse(clientSocket);
+    // response = receiveResponse(clientSocket);
 
     close(clientSocket);
   }
