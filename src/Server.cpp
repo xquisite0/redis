@@ -467,7 +467,7 @@ int main(int argc, char **argv) {
     // std::cout << "\n\nMessage sent to Master\n\n";
 
     std::string response = receiveResponse(clientSocket);
-    // std::cout << "\n\nResponse received: " << response << "\n\n";
+    std::cout << "\n\nResponse received: " << response << "\n\n";
 
     message = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$" +
               std::to_string(std::to_string(port).size()) + "\r\n" +
