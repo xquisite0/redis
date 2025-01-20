@@ -429,10 +429,11 @@ int main(int argc, char **argv) {
     master_addr.sin_port = htons(MASTER_PORT);
 
     connect(clientSocket, (struct sockaddr *)&master_addr, sizeof(master_addr));
+    std::cout << "\n\nReplica connected to Master\n\n";
 
     const char *message = "*1\r\n$4\r\nPING\r\n";
     send(clientSocket, message, strlen(message), 0);
-    std::cout << "\n\nReplica connected to Master\n\n";
+    std::cout << "\n\Message sent to Master\n\n";
 
     close(clientSocket);
   }
