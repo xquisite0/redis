@@ -414,7 +414,9 @@ int main(int argc, char **argv) {
 
   // bind to master
   if (replicaof != "") {
-    std::string master_host_string = replicaof.substr(0, replicaof.find(' '));
+    // std::string master_host_string = replicaof.substr(0, replicaof.find('
+    // '));
+    std::string master_host_string = "127.0.0.1";
     in_addr_t MASTER_HOST = inet_addr(master_host_string.c_str());
     int MASTER_PORT = stoi(replicaof.substr(replicaof.find(' ') + 1));
     std::cout << "\nMASTER_HOST & PORT " << master_host_string << " "
