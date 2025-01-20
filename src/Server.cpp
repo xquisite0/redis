@@ -428,10 +428,12 @@ int main(int argc, char **argv) {
     master_addr.sin_addr.s_addr = MASTER_HOST;
     master_addr.sin_port = htons(MASTER_PORT);
 
-    std::cout << "\n\nConnect value: "
-              << connect(clientSocket, (struct sockaddr *)&master_addr,
-                         sizeof(master_addr))
-              << "\n\n";
+    if (connect(clientSocket, (struct sockaddr *)&master_addr,
+                sizeof(master_addr)) < 0) {
+      perror("Connection failed");
+      close(clientSocket);
+      return -1;
+    }
     std::cout << "\n\nReplica connected to Master\n\n";
 
     const char *message = "*1\r\n$4\r\nPING\r\n";
