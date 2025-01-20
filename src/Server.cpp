@@ -264,12 +264,12 @@ void handleClient(int client_fd, const std::string &dir,
         } else if (command == "set") {
 
           for (int fd : replicaSockets) {
-            std::cout << "\nPROPAGATED\n";
             send(fd, std::string(buffer).c_str(), std::string(buffer).size(),
                  0);
           }
           std::cout << "\n\nSET KEY: " << message.elements[1].value
-                    << " with VALUE: " << message.elements[2].value << "\n\n";
+                    << " with VALUE: " << message.elements[2].value
+                    << " with replica: " << replicaof << "\n\n";
           keyValue[message.elements[1].value] = message.elements[2].value;
           response = "+OK\r\n";
 
