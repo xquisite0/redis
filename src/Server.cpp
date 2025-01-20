@@ -379,6 +379,8 @@ void handleClient(int client_fd, const std::string &dir,
           response = "+FULLRESYNC " + master_replid + " " +
                      std::to_string(master_repl_offset) + "\r\n";
 
+          send(client_fd, response.c_str(), response.size(), 0);
+
           // send our RDB file for replica to sync to
 
           // simulate with an empty RDB file
