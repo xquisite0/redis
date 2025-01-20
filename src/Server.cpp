@@ -525,6 +525,8 @@ int main(int argc, char **argv) {
 
     response = receiveResponse(clientSocket);
 
+    handleClient(clientSocket, dir, dbfilename, port, replicaof);
+
     close(clientSocket);
   }
 
