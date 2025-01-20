@@ -193,10 +193,13 @@ std::string receiveResponse(int socketFd) {
   char buffer[bufferSize];
 
   ssize_t bytesReceived;
-  while ((bytesReceived = recv(socketFd, buffer, sizeof(buffer) - 1, 0)) > 0) {
-    buffer[bytesReceived] = '\0'; // Null-terminate received data
-    response += buffer;           // Append to response string
-  }
+  bytesReceived = recv(socketFd, buffer, sizeof(buffer) - 1, 0);
+  response += buffer;
+  // while ((bytesReceived = recv(socketFd, buffer, sizeof(buffer) - 1, 0)) > 0)
+  // {
+  //   buffer[bytesReceived] = '\0'; // Null-terminate received data
+  //   response += buffer;           // Append to response string
+  // }
 
   if (bytesReceived == 0) {
     std::cout << "Server closed the connection.\n";
