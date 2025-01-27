@@ -513,21 +513,22 @@ int main(int argc, char **argv) {
     // std::cout << "\n\nMessage sent to Master\n\n";
 
     std::string response = receiveResponse(clientSocket);
-    std::cout << "\n\nResponse received: " << response << "\n\n";
+    // std::cout << "\n\nResponse received: " << response << "\n\n";
 
     message = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$" +
               std::to_string(std::to_string(port).size()) + "\r\n" +
               std::to_string(port) + "\r\n";
 
     send(clientSocket, message.c_str(), message.size(), 0);
+    response = receiveResponse(clientSocket);
+    std::cout << "\n\n OK1: " << response << "\n\n";
 
     message = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
 
     send(clientSocket, message.c_str(), message.size(), 0);
 
     response = receiveResponse(clientSocket);
-    std::cout << "\n\n"
-              << "RESPONSE1: " << response << "\n\n";
+    std::cout << "\n\n OK2: " << response << "\n\n";
 
     message = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
 
@@ -535,7 +536,7 @@ int main(int argc, char **argv) {
 
     response = receiveResponse(clientSocket);
     std::cout << "\n\n"
-              << "RESPONSE2: " << response << "\n\n";
+              << "FULLRESYNC : " << response << "\n\n";
 
     // handleClient(clientSocket, dir, dbfilename, port, replicaof);
     std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof)
