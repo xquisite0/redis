@@ -1,5 +1,6 @@
 #include "ProtocolParser.h"
 #include <arpa/inet.h>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
@@ -21,6 +22,7 @@ std::string master_replid = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 int master_repl_offset = 0;
 std::vector<int> replicaSockets;
 std::unordered_map<std::string, std::string> keyValue;
+bool propagated = false;
 
 static void readBytes(std::ifstream &is, char *buffer, int length) {
   if (!is.read(buffer, length)) {
@@ -214,7 +216,11 @@ std::string receiveResponse(int socketFd) {
 
 void handleClient(int client_fd, const std::string &dir,
                   const std::string &dbfilename, int port,
-                  std::string replicaof) {
+                  std::string replicaof, bool isPropagation) {
+
+  while (!isPropagation && !propagated && replicaof != "") {
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+  }
   std::unordered_map<std::string, unsigned long long> keyStartExpiry;
 
   // restore state of Redis with persistence.
@@ -420,8 +426,15 @@ void handleClient(int client_fd, const std::string &dir,
 
     // std::string response = "+PONG\r\n";
     // std::cout << "\nResponse to send: " << response << "\n";
-    std::cout << "\n\nSending: " << response << "\n\n";
-    send(client_fd, response.c_str(), response.size(), 0);
+
+    if (!isPropagation) {
+      std::cout << "\n\nSending: " << response << "\n\n";
+      send(client_fd, response.c_str(), response.size(), 0);
+    }
+
+    if (isPropagation && replicaof != "") {
+      propagated = true;
+    }
   }
   close(client_fd);
 }
@@ -539,9 +552,10 @@ int main(int argc, char **argv) {
               << "FULLRESYNC : " << response << "\n\n";
 
     // handleClient(clientSocket, dir, dbfilename, port, replicaof);
-    // std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof)
-    //     .detach();
-    handleClient(clientSocket, dir, dbfilename, port, replicaof);
+    std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof,
+                true)
+        .detach();
+    // handleClient(clientSocket, dir, dbfilename, port, replicaof);
   }
 
   int connection_backlog = 5;
@@ -567,7 +581,8 @@ int main(int argc, char **argv) {
                            (socklen_t *)&client_addr_len);
 
     if (client_fd >= 0) {
-      std::thread(handleClient, client_fd, dir, dbfilename, port, replicaof)
+      std::thread(handleClient, client_fd, dir, dbfilename, port, replicaof,
+                  false)
           .detach();
     }
 
