@@ -244,6 +244,7 @@ void handleClient(int client_fd, const std::string &dir,
     int bytesRead = read(client_fd, buffer, sizeof(buffer));
     if (bytesRead <= 0)
       break;
+    std::cout << "\n\nBytesRead: " << bytesRead << "\n\n";
     // std::cout << "Client: " << buffer << std::endl;
 
     ProtocolParser parser;
@@ -254,7 +255,6 @@ void handleClient(int client_fd, const std::string &dir,
     // Checking for ECHO command
     if (!message.elements.empty()) {
       RedisMessage firstElement = message.elements[0];
-      std::cout << "Command type: " << firstElement.type << "\n\n";
       if (firstElement.type == BULK_STRING) {
 
         std::string command = "";
