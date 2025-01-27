@@ -526,6 +526,8 @@ int main(int argc, char **argv) {
     send(clientSocket, message.c_str(), message.size(), 0);
 
     response = receiveResponse(clientSocket);
+    std::cout << "\n\n"
+              << "RESPONSE1: " << response << "\n\n";
 
     message = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
 
@@ -533,7 +535,7 @@ int main(int argc, char **argv) {
 
     response = receiveResponse(clientSocket);
     std::cout << "\n\n"
-              << "RESPONSE: " << response << "\n\n";
+              << "RESPONSE2: " << response << "\n\n";
 
     // handleClient(clientSocket, dir, dbfilename, port, replicaof);
     std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof)
