@@ -420,7 +420,7 @@ void handleClient(int client_fd, const std::string &dir,
 
     // std::string response = "+PONG\r\n";
     // std::cout << "\nResponse to send: " << response << "\n";
-    std::cout << "\n\nRESPONSE: " << response << "\n\n";
+    std::cout << "\n\nSending: " << response << "\n\n";
     send(client_fd, response.c_str(), response.size(), 0);
   }
   close(client_fd);
@@ -532,7 +532,8 @@ int main(int argc, char **argv) {
     send(clientSocket, message.c_str(), message.size(), 0);
 
     response = receiveResponse(clientSocket);
-    std::cout << response << std::endl;
+    std::cout << "\n\n"
+              << "RESPONSE: " << response << "\n\n";
 
     // handleClient(clientSocket, dir, dbfilename, port, replicaof);
     std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof)
