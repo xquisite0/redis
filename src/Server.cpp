@@ -156,14 +156,14 @@ void parseRDB(
         expirySet = false;
       }
     } else if (opcode == 0xFC) {
-      std::cout << "\n\n";
+      // std::cout << "\n\n";
       unsigned long long time = 0;
       for (int i = 0; i < 8; i++) {
         unsigned long long byte = readByte(is);
         time |= (byte << (8 * i));
         // time |= byte;
       }
-      std::cout << "\n\n";
+      // std::cout << "\n\n";
 
       // auto set_time = std::chrono::high_resolution_clock::now();
 
@@ -220,9 +220,9 @@ void handleClient(int client_fd, const std::string &dir,
   // restore state of Redis with persistence.
   parseRDB(keyValue, keyStartExpiry, dir, dbfilename);
 
-  for (const auto &[key, value] : keyStartExpiry) {
-    std::cout << key << ": " << value << std::endl;
-  }
+  // for (const auto &[key, value] : keyStartExpiry) {
+  //   std::cout << key << ": " << value << std::endl;
+  // }
   auto now = std::chrono::system_clock::now();
 
   // Convert to milliseconds since the Unix epoch
@@ -272,7 +272,7 @@ void handleClient(int client_fd, const std::string &dir,
                     << " with replica: " << replicaof << "\n\n";
           keyValue[message.elements[1].value] = message.elements[2].value;
 
-          std::cout << "\ntest: " << keyValue["foo"] << "\n";
+          // std::cout << "\ntest: " << keyValue["foo"] << "\n";
           response = "+OK\r\n";
 
           if (message.elements.size() > 2) {
@@ -539,8 +539,9 @@ int main(int argc, char **argv) {
               << "FULLRESYNC : " << response << "\n\n";
 
     // handleClient(clientSocket, dir, dbfilename, port, replicaof);
-    std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof)
-        .detach();
+    // std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof)
+    //     .detach();
+    handleClient(clientSocket, dir, dbfilename, port, replicaof);
   }
 
   int connection_backlog = 5;
