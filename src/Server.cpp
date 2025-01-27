@@ -244,6 +244,7 @@ void handleClient(int client_fd, const std::string &dir,
     int bytesRead = read(client_fd, buffer, sizeof(buffer));
     if (bytesRead <= 0)
       break;
+    std::cout << "\n\nBuffer: " << buffer << "\n\n";
     std::cout << "\n\nBytesRead: " << bytesRead << "\n\n";
     // std::cout << "Client: " << buffer << std::endl;
 
