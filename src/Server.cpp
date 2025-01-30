@@ -422,6 +422,14 @@ void handleClient(int client_fd, const std::string &dir,
           response = "$" + std::to_string(bytes.size()) + "\r\n" + bytes;
 
           replicaSockets.push_back(client_fd);
+        } else if (command == "replconf") {
+          if (message.elements.size() >= 3) {
+            if (message.elements[1].value == "GETACK") {
+              if (message.elements[2].value == "*") {
+                response = "*3\r\n$8\r\nreplconf\r\n$3\r\nack\r\n$1\r\n*\r\n"
+              }
+            }
+          }
         }
       }
     }
