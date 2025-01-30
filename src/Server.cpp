@@ -426,7 +426,7 @@ void handleClient(int client_fd, const std::string &dir,
           if (message.elements.size() >= 3) {
             if (message.elements[1].value == "GETACK") {
               if (message.elements[2].value == "*") {
-                response = "*3\r\n$8\r\nreplconf\r\n$3\r\nack\r\n$1\r\n*\r\n"
+                response = "*3\r\n$8\r\nreplconf\r\n$3\r\nack\r\n$1\r\n*\r\n";
               }
             }
           }
