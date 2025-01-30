@@ -396,6 +396,7 @@ void handleClient(int client_fd, const std::string &dir,
             response = "$10\r\nrole:slave\r\n";
           }
         } else if (command == "replconf") {
+          std::cout << "Ran\n";
           if (replicaof == "") {
             response = "+OK\r\n";
           } else {
