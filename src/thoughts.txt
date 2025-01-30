@@ -1,0 +1,5 @@
+There's an issue with receiving commands. 
+
+At times, The FULLRESYNC and RDB file are sent in the same .read() stream, sometimes they're sent in different .read() streams. 
+
+Leads to issues with regards to whether I can access the read/write commands that follow these.

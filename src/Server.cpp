@@ -567,6 +567,7 @@ int main(int argc, char **argv) {
     send(clientSocket, message.c_str(), message.size(), 0);
 
     response = receiveResponse(clientSocket);
+    response = receiveResponse(clientSocket);
     std::cout << "\n\n Hi there! Here's the RDB response (checking if replconf "
                  "cmmnd is here): "
               << response << std::endl;
