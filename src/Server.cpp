@@ -218,6 +218,8 @@ void handleClient(int client_fd, const std::string &dir,
                   const std::string &dbfilename, int port,
                   std::string replicaof, bool isPropagation) {
 
+  std::cout << "\nThread has spun up! for client " << client_fd << "\n\n";
+
   // while (!isPropagation && !propagated && replicaof != "") {
   //   std::this_thread::sleep_for(std::chrono::seconds(1));
   // }
