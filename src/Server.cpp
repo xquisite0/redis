@@ -396,7 +396,21 @@ void handleClient(int client_fd, const std::string &dir,
             response = "$10\r\nrole:slave\r\n";
           }
         } else if (command == "replconf") {
-          response = "+OK\r\n";
+          if (replicaof == "") {
+            response = "+OK\r\n";
+          } else {
+            std::cout << "\nSize: " << message.elements.size() << "\n\n";
+            if (message.elements.size() >= 3) {
+              std::cout << "\n1 value: " << message.elements[1].value << "\n\n";
+              if (message.elements[1].value == "GETACK") {
+                std::cout << "\n2 value: " << message.elements[2].value
+                          << "\n\n";
+                if (message.elements[2].value == "*") {
+                  response = "*3\r\n$8\r\nreplconf\r\n$3\r\nack\r\n$1\r\n*\r\n";
+                }
+              }
+            }
+          }
         } else if (command == "psync") {
           response = "+FULLRESYNC " + master_replid + " " +
                      std::to_string(master_repl_offset) + "\r\n";
@@ -422,17 +436,6 @@ void handleClient(int client_fd, const std::string &dir,
           response = "$" + std::to_string(bytes.size()) + "\r\n" + bytes;
 
           replicaSockets.push_back(client_fd);
-        } else if (command == "replconf") {
-          std::cout << "\nSize: " << message.elements.size() << "\n\n";
-          if (message.elements.size() >= 3) {
-            std::cout << "\n1 value: " << message.elements[1].value << "\n\n";
-            if (message.elements[1].value == "GETACK") {
-              std::cout << "\n2 value: " << message.elements[2].value << "\n\n";
-              if (message.elements[2].value == "*") {
-                response = "*3\r\n$8\r\nreplconf\r\n$3\r\nack\r\n$1\r\n*\r\n";
-              }
-            }
-          }
         }
       }
     }
@@ -547,22 +550,22 @@ int main(int argc, char **argv) {
 
     send(clientSocket, message.c_str(), message.size(), 0);
     response = receiveResponse(clientSocket);
-    std::cout << "\n\n OK1: " << response << "\n\n";
+    // std::cout << "\n\n OK1: " << response << "\n\n";
 
     message = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
 
     send(clientSocket, message.c_str(), message.size(), 0);
 
     response = receiveResponse(clientSocket);
-    std::cout << "\n\n OK2: " << response << "\n\n";
+    // std::cout << "\n\n OK2: " << response << "\n\n";
 
     message = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
 
     send(clientSocket, message.c_str(), message.size(), 0);
 
     response = receiveResponse(clientSocket);
-    std::cout << "\n\n"
-              << "FULLRESYNC : " << response << "\n\n";
+    // std::cout << "\n\n"
+    //           << "FULLRESYNC : " << response << "\n\n";
 
     // handleClient(clientSocket, dir, dbfilename, port, replicaof);
     std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof,
