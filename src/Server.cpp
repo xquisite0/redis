@@ -444,14 +444,14 @@ void handleClient(int client_fd, const std::string &dir,
     // std::string response = "+PONG\r\n";
     // std::cout << "\nResponse to send: " << response << "\n";
 
-    if (!isPropagation) {
-      std::cout << "\n\nSending: " << response << "\n\n";
-      send(client_fd, response.c_str(), response.size(), 0);
-    }
+    // if (!isPropagation) {
+    std::cout << "\n\nSending: " << response << "\n\n";
+    send(client_fd, response.c_str(), response.size(), 0);
+    // }
 
-    if (isPropagation && replicaof != "") {
-      propagated = true;
-    }
+    // if (isPropagation && replicaof != "") {
+    //   propagated = true;
+    // }
   }
   close(client_fd);
 }
