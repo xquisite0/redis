@@ -218,9 +218,9 @@ void handleClient(int client_fd, const std::string &dir,
                   const std::string &dbfilename, int port,
                   std::string replicaof, bool isPropagation) {
 
-  while (!isPropagation && !propagated && replicaof != "") {
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-  }
+  // while (!isPropagation && !propagated && replicaof != "") {
+  //   std::this_thread::sleep_for(std::chrono::seconds(1));
+  // }
   std::unordered_map<std::string, unsigned long long> keyStartExpiry;
 
   // restore state of Redis with persistence.
@@ -565,8 +565,7 @@ int main(int argc, char **argv) {
     send(clientSocket, message.c_str(), message.size(), 0);
 
     response = receiveResponse(clientSocket);
-    std::cout << "\n\n"
-              << "FULLRESYNC : " << response << "\n\n";
+    std::cout << std::endl;
 
     // handleClient(clientSocket, dir, dbfilename, port, replicaof);
     std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof,
