@@ -218,8 +218,6 @@ void handleClient(int client_fd, const std::string &dir,
                   const std::string &dbfilename, int port,
                   std::string replicaof, bool isPropagation) {
 
-  std::cout << "\nThread has spun up! for client " << client_fd << "\n\n";
-
   // while (!isPropagation && !propagated && replicaof != "") {
   //   std::this_thread::sleep_for(std::chrono::seconds(1));
   // }
@@ -241,21 +239,31 @@ void handleClient(int client_fd, const std::string &dir,
   long long unix_time_ms = duration.count();
   // std::cout << "\n\n Time Now: " << unix_time_ms << std::endl;
 
-  char buffer[1024];
+  // char buffer[1024];
   while (true) {
-    int bytesRead = read(client_fd, buffer, sizeof(buffer));
-    if (bytesRead <= 0)
-      break;
-    std::cout << "\n\nBuffer: " << buffer << "\n\n";
-    std::cout << "\n\nBytesRead: " << bytesRead << "\n\n";
+    // int bytesRead = read(client_fd, buffer, sizeof(buffer));
+    // if (bytesRead <= 0)
+    //   break;
+    // std::cout << "\n\nBuffer: " << buffer << "\n\n";
+    // std::cout << "\n\nBytesRead: " << bytesRead << "\n\n";
     // std::cout << "Client: " << buffer << std::endl;
 
-    ProtocolParser parser;
-    RedisMessage message = parser.parse(buffer);
+    // check whether the connection is closed by peeking at the top of the
+    // buffer
+    char buffer;
+    if (recv(client_fd, &buffer, 1, MSG_PEEK) <= 0) {
+      break;
+    }
+
+    ProtocolParser parser(client_fd);
+    parser.reset();
+    RedisMessage message = parser.parse();
+    std::cout << "Message: \n" << message.rawMessage << "\n";
 
     std::string response;
 
     // Checking for ECHO command
+    std::cout << "THIS RAN " << message.elements.empty() << "\n";
     if (!message.elements.empty()) {
       RedisMessage firstElement = message.elements[0];
       if (firstElement.type == BULK_STRING) {
@@ -274,8 +282,7 @@ void handleClient(int client_fd, const std::string &dir,
         } else if (command == "set") {
 
           for (int fd : replicaSockets) {
-            send(fd, std::string(buffer).c_str(), std::string(buffer).size(),
-                 0);
+            send(fd, message.rawMessage.c_str(), message.rawMessage.size(), 0);
           }
           std::cout << "\n\nSET KEY: " << message.elements[1].value
                     << " with VALUE: " << message.elements[2].value
@@ -458,6 +465,98 @@ void handleClient(int client_fd, const std::string &dir,
   close(client_fd);
 }
 
+void executeHandshake(const std::string &dir, const std::string &dbfilename,
+                      int port, std::string replicaof) {
+  std::string master_host_string = replicaof.substr(0, replicaof.find(' '));
+  if (master_host_string == "localhost") {
+    master_host_string = "127.0.0.1";
+  }
+  in_addr_t MASTER_HOST = inet_addr(master_host_string.c_str());
+  std::string master_port_string = replicaof.substr(replicaof.find(' ') + 1);
+  int MASTER_PORT = stoi(master_port_string);
+  std::cout << "\nMASTER_HOST & PORT " << master_host_string << " "
+            << MASTER_PORT << "\n";
+
+  int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+  std::cout << "Client Socket value: " << clientSocket << "\n";
+
+  struct sockaddr_in master_addr;
+  master_addr.sin_family = AF_INET;
+  master_addr.sin_addr.s_addr = MASTER_HOST;
+  std::cout << "\nPort of Master " << MASTER_PORT << "\n";
+  master_addr.sin_port = htons(MASTER_PORT);
+
+  if (connect(clientSocket, (struct sockaddr *)&master_addr,
+              sizeof(master_addr)) < 0) {
+    perror("Connection failed");
+    close(clientSocket);
+    return;
+  }
+  // std::cout << "\n\nReplica connected to Master\n\n";
+
+  std::string message = "*1\r\n$4\r\nPING\r\n";
+
+  // Send PING message
+  send(clientSocket, message.c_str(), message.size(), 0);
+  // std::cout << "\n\nMessage sent to Master\n\n";
+
+  std::string response = receiveResponse(clientSocket);
+  // std::cout << "\n\nResponse received: " << response << "\n\n";
+
+  message = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$" +
+            std::to_string(std::to_string(port).size()) + "\r\n" +
+            std::to_string(port) + "\r\n";
+
+  send(clientSocket, message.c_str(), message.size(), 0);
+  response = receiveResponse(clientSocket);
+  // std::cout << "\n\n OK1: " << response << "\n\n";
+
+  message = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
+
+  send(clientSocket, message.c_str(), message.size(), 0);
+
+  response = receiveResponse(clientSocket);
+  // std::cout << "\n\n OK2: " << response << "\n\n";
+
+  message = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
+
+  send(clientSocket, message.c_str(), message.size(), 0);
+
+  // extract RDB File
+  // char buffer[1024]
+  // int bytesRead = read(clientSocket, buffer, sizeof(buffer));
+  ProtocolParser parser(clientSocket);
+
+  // should be the fullresync message
+  RedisMessage parsedResponse = parser.parse();
+  // std::cout << "First Message: \n " << parsedResponse.rawMessage << "\n\n";
+
+  // should be the RDB file
+  parser.reset();
+  parser.isRDB = true;
+  parsedResponse = parser.parse();
+  parser.isRDB = false;
+  // std::cout << "Second message: \n" << parsedResponse.rawMessage << "\n";
+
+  // response = receiveResponse(clientSocket);
+  // std::cout
+  //     << "\n\n 1Hi there! Here's the RDB response (checking if replconf "
+  //        "cmmnd is here): "
+  //     << response << std::endl;
+  // response = receiveResponse(clientSocket);
+  // std::cout << "\n\n Hi there! Here's the RDB response (checking if
+  // replconf "
+  //              "cmmnd is here): "
+  //           << response << std::endl;
+
+  // handleClient(clientSocket, dir, dbfilename, port, replicaof);
+  // close(clientSocket);
+  std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof,
+              true)
+      .detach();
+  // handleClient(clientSocket, dir, dbfilename, port, replicaof);
+}
+
 int main(int argc, char **argv) {
   // Flush after every std::cout / std::cerr
   std::cout << std::unitbuf;
@@ -505,78 +604,14 @@ int main(int argc, char **argv) {
 
   if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) !=
       0) {
-    std::cerr << "Failed to bind to port 6379\n";
+    std::cerr << "Failed to bind to port " << port << "\n";
     return 1;
   }
 
   // bind to master
   int clientSocket = -1;
   if (replicaof != "") {
-    std::string master_host_string = replicaof.substr(0, replicaof.find(' '));
-    if (master_host_string == "localhost") {
-      master_host_string = "127.0.0.1";
-    }
-    in_addr_t MASTER_HOST = inet_addr(master_host_string.c_str());
-    std::string master_port_string = replicaof.substr(replicaof.find(' ') + 1);
-    int MASTER_PORT = stoi(master_port_string);
-    std::cout << "\nMASTER_HOST & PORT " << master_host_string << " "
-              << MASTER_PORT << "\n";
-
-    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-    std::cout << "Client Socket value: " << server_fd << "\n";
-
-    struct sockaddr_in master_addr;
-    master_addr.sin_family = AF_INET;
-    master_addr.sin_addr.s_addr = MASTER_HOST;
-    master_addr.sin_port = htons(MASTER_PORT);
-
-    if (connect(clientSocket, (struct sockaddr *)&master_addr,
-                sizeof(master_addr)) < 0) {
-      perror("Connection failed");
-      close(clientSocket);
-      return -1;
-    }
-    // std::cout << "\n\nReplica connected to Master\n\n";
-
-    std::string message = "*1\r\n$4\r\nPING\r\n";
-
-    // Send PING message
-    send(clientSocket, message.c_str(), message.size(), 0);
-    // std::cout << "\n\nMessage sent to Master\n\n";
-
-    std::string response = receiveResponse(clientSocket);
-    // std::cout << "\n\nResponse received: " << response << "\n\n";
-
-    message = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$" +
-              std::to_string(std::to_string(port).size()) + "\r\n" +
-              std::to_string(port) + "\r\n";
-
-    send(clientSocket, message.c_str(), message.size(), 0);
-    response = receiveResponse(clientSocket);
-    // std::cout << "\n\n OK1: " << response << "\n\n";
-
-    message = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
-
-    send(clientSocket, message.c_str(), message.size(), 0);
-
-    response = receiveResponse(clientSocket);
-    // std::cout << "\n\n OK2: " << response << "\n\n";
-
-    message = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
-
-    send(clientSocket, message.c_str(), message.size(), 0);
-
-    response = receiveResponse(clientSocket);
-    response = receiveResponse(clientSocket);
-    std::cout << "\n\n Hi there! Here's the RDB response (checking if replconf "
-                 "cmmnd is here): "
-              << response << std::endl;
-
-    // handleClient(clientSocket, dir, dbfilename, port, replicaof);
-    std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof,
-                true)
-        .detach();
-    // handleClient(clientSocket, dir, dbfilename, port, replicaof);
+    std::thread(executeHandshake, dir, dbfilename, port, replicaof).detach();
   }
 
   int connection_backlog = 5;
