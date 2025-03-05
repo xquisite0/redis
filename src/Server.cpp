@@ -452,6 +452,10 @@ void handleClient(int client_fd, const std::string &dir,
           response = "$" + std::to_string(bytes.size()) + "\r\n" + bytes;
 
           replicaSockets.push_back(client_fd);
+        } else if (command == "wait") {
+          std::string numreplicas = message.elements[1].value;
+          std::string timeout = message.elements[2].value;
+          response = ":0\r\n";
         }
       }
     }
