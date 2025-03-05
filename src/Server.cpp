@@ -23,6 +23,8 @@ int master_repl_offset = 0;
 std::vector<int> replicaSockets;
 std::unordered_map<std::string, std::string> keyValue;
 bool propagated = false;
+int master_fd = -1;
+int replica_offset = 0;
 
 static void readBytes(std::ifstream &is, char *buffer, int length) {
   if (!is.read(buffer, length)) {
@@ -416,10 +418,15 @@ void handleClient(int client_fd, const std::string &dir,
                 std::cout << "\n2 value: " << message.elements[2].value
                           << "\n\n";
                 if (message.elements[2].value == "*") {
-                  response = "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n";
+                  response = "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$" +
+                                 std::to_string(
+                                     std::to_string(replica_offset).size()) +
+                                 "\r\n"
+                             << std::to_string(replica_offset) << "\r\n";
                 }
               }
             }
+            send(client_fd, response.c_str(), response.size(), 0);
           }
         } else if (command == "psync") {
           response = "+FULLRESYNC " + master_replid + " " +
@@ -455,7 +462,14 @@ void handleClient(int client_fd, const std::string &dir,
 
     // if (!isPropagation) {
     std::cout << "\n\nSending: " << response << "\n\n";
-    send(client_fd, response.c_str(), response.size(), 0);
+
+    // if we are a replica, with our current socket connected to the master for
+    // propagated commands
+    if (client_fd == master_fd) {
+      replica_offset += message.rawMessage.size();
+    } else {
+      send(client_fd, response.c_str(), response.size(), 0);
+    }
     // }
 
     // if (isPropagation && replicaof != "") {
@@ -478,6 +492,7 @@ void executeHandshake(const std::string &dir, const std::string &dbfilename,
             << MASTER_PORT << "\n";
 
   int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+  master_fd = clientSocket;
   std::cout << "Client Socket value: " << clientSocket << "\n";
 
   struct sockaddr_in master_addr;
