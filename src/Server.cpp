@@ -418,11 +418,10 @@ void handleClient(int client_fd, const std::string &dir,
                 std::cout << "\n2 value: " << message.elements[2].value
                           << "\n\n";
                 if (message.elements[2].value == "*") {
-                  response = "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$" +
-                                 std::to_string(
-                                     std::to_string(replica_offset).size()) +
-                                 "\r\n"
-                             << std::to_string(replica_offset) << "\r\n";
+                  response =
+                      "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$" +
+                      std::to_string(std::to_string(replica_offset).size()) +
+                      "\r\n" + std::to_string(replica_offset) + "\r\n";
                 }
               }
             }
