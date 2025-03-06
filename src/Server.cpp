@@ -454,6 +454,7 @@ void handleClient(int client_fd, const std::string &dir,
 
           replicaSockets.push_back(client_fd);
         } else if (command == "wait") {
+          std::cout << "\nControl has come to the WAIT processing section\n";
           int numreplicas = stoi(message.elements[1].value);
           int timeout = stoi(message.elements[2].value);
 
