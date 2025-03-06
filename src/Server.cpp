@@ -471,7 +471,7 @@ void handleClient(int client_fd, const std::string &dir,
             response = ":" + std::to_string(replicaSockets.size()) + "\r\n";
           } else {
             std::string offsetRequest =
-                "*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n";
+                "*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n";
             while (true) {
               int syncedReplicas = 0;
 
