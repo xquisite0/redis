@@ -489,6 +489,8 @@ void handleClient(int client_fd, const std::string &dir,
               int syncedReplicas = 0;
 
               // int curReplica = 0;
+              std::cout << "\nmaster_repl_offset " << master_repl_offset
+                        << "\n";
 
               for (int fd : replicaSockets) {
                 setRecvTimeout(fd, 100);
