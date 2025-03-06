@@ -485,6 +485,9 @@ void handleClient(int client_fd, const std::string &dir,
                 // check whether the connection is closed by peeking at the top
                 // of the buffer
                 char buffer;
+                std::cout << "\nRECV val: "
+                          << std::to_string(recv(fd, &buffer, 1, MSG_PEEK))
+                          << "\n";
                 if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
                   continue;
                 }
