@@ -454,7 +454,6 @@ void handleClient(int client_fd, const std::string &dir,
 
           replicaSockets.push_back(client_fd);
         } else if (command == "wait") {
-          std::cout << "\nControl has come to the WAIT processing section\n";
           int numreplicas = stoi(message.elements[1].value);
           int timeout = stoi(message.elements[2].value);
 
@@ -474,12 +473,12 @@ void handleClient(int client_fd, const std::string &dir,
             std::string offsetRequest =
                 "*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n";
 
-            std::cout << "\nNumber of replicas: " << replicaSockets.size()
-                      << "\n";
             while (true) {
               int syncedReplicas = 0;
 
               for (int fd : replicaSockets) {
+                std::cout << "\nChecking the offset of replica socket number "
+                          << fd << "\n";
                 send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
                 ProtocolParser parser(fd);
                 RedisMessage offsetMessage = parser.parse();
