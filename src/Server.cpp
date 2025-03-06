@@ -482,14 +482,13 @@ void handleClient(int client_fd, const std::string &dir,
                 send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
                 ProtocolParser parser(fd);
                 RedisMessage offsetMessage = parser.parse();
+                std::cout << "\nFinished obtaining the message with the offset "
+                             "of replica socket number "
+                          << fd << "\n";
                 int offset = stoi(offsetMessage.elements[2].value);
 
                 if (offset == master_repl_offset)
                   syncedReplicas++;
-
-                std::cout << "\nFinished checking the offset of replica socket "
-                             "number "
-                          << fd << "\n";
               }
 
               master_repl_offset += offsetRequest.size();
