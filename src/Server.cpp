@@ -500,7 +500,7 @@ void handleClient(int client_fd, const std::string &dir,
             // std::this_thread::sleep_for(std::chrono::milliseconds(125));
 
             for (int fd : replicaSockets) {
-              // setRecvTimeout(fd, 500);
+              setRecvTimeout(fd, 1000);
               curReplica++;
               std::cout << "\nChecking the offset of replica socket number "
                         << curReplica << "\n";
