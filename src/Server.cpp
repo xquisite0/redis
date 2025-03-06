@@ -489,15 +489,15 @@ void handleClient(int client_fd, const std::string &dir,
             // while (true) {
             int syncedReplicas = 0;
 
-            // int curReplica = 0;
-            std::cout << "\nmaster_repl_offset " << master_repl_offset << "\n";
+            int curReplica = 0;
+            // std::cout << "\nmaster_repl_offset " << master_repl_offset <<
+            // "\n";
 
             for (int fd : replicaSockets) {
               setRecvTimeout(fd, 100);
-              // curReplica++;
-              // std::cout << "\nChecking the offset of replica socket number
-              // "
-              //           << fd << "\n";
+              curReplica++;
+              std::cout << "\nChecking the offset of replica socket number "
+                        << fd << "\n";
               send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
 
               // check whether the connection is closed by peeking at the top
