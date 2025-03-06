@@ -486,6 +486,10 @@ void handleClient(int client_fd, const std::string &dir,
 
                 if (offset == master_repl_offset)
                   syncedReplicas++;
+
+                std::cout << "\nFinished checking the offset of replica socket "
+                             "number "
+                          << fd << "\n";
               }
 
               master_repl_offset += offsetRequest.size();
