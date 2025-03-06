@@ -29,6 +29,7 @@ void ProtocolParser::reset() { rawMessage = ""; }
 RedisMessage ProtocolParser::parse() {
   char prefix;
   if (recv(sockfd, &prefix, 1, 0) <= 0) {
+    std::cout << "\nPrefix is " << prefix << "\n";
     throw std::runtime_error("Error reading prefix from socket");
   }
   rawMessage += prefix;
