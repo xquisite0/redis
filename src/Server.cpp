@@ -509,10 +509,9 @@ void handleClient(int client_fd, const std::string &dir,
 
               ProtocolParser parser(fd);
               RedisMessage offsetMessage = parser.parse();
-              // std::cout << "\nFinished obtaining the message with the
-              // offset "
-              //              "of replica socket number "
-              //           << fd << "\n";
+              std::cout << "\nFinished obtaining the message with the offset "
+                           "of replica socket number "
+                        << curReplica << "\n";
               int offset = stoi(offsetMessage.elements[2].value);
               std::cout << "\nReplica socket number " << fd
                         << " gave the following offset value: "
