@@ -295,9 +295,9 @@ void handleClient(int client_fd, const std::string &dir,
 
         } else if (command == "set") {
 
+          master_repl_offset += message.rawMessage.size();
           for (int fd : replicaSockets) {
             send(fd, message.rawMessage.c_str(), message.rawMessage.size(), 0);
-            master_repl_offset += message.rawMessage.size();
           }
           std::cout << "\n\nSET KEY: " << message.elements[1].value
                     << " with VALUE: " << message.elements[2].value
