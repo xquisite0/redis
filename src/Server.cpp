@@ -489,8 +489,7 @@ void handleClient(int client_fd, const std::string &dir,
                 // of the buffer
                 char buffer;
                 std::cout << "\nRECV val for replica " << curReplica << ": "
-                          << std::to_string(recv(fd, &buffer, 1, MSG_PEEK))
-                          << "\n";
+                          << recv(fd, &buffer, 1, MSG_PEEK) << "\n";
                 if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
                   std::cout << "\nSkipping replica " << curReplica << "\n";
                   continue;
