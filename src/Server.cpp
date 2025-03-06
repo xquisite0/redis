@@ -497,7 +497,7 @@ void handleClient(int client_fd, const std::string &dir,
               setRecvTimeout(fd, 100);
               curReplica++;
               std::cout << "\nChecking the offset of replica socket number "
-                        << fd << "\n";
+                        << curReplica << "\n";
               send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
 
               // check whether the connection is closed by peeking at the top
