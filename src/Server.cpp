@@ -10,6 +10,7 @@
 #include <iostream>
 #include <mutex>
 #include <netdb.h>
+#include <netinet/in.h>
 #include <sstream>
 #include <string>
 #include <sys/socket.h>
@@ -25,6 +26,17 @@ std::unordered_map<std::string, std::string> keyValue;
 bool propagated = false;
 int master_fd = -1;
 int replica_offset = 0;
+
+void setRecvTimeout(int fd, int timeout_ms) {
+  struct timeval tv;
+  tv.tv_sec = timeout_ms / 1000;           // Convert milliseconds to seconds
+  tv.tv_usec = (timeout_ms % 1000) * 1000; // Convert remainder to microseconds
+
+  if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv)) <
+      0) {
+    std::cerr << "Error setting socket timeout" << std::endl;
+  }
+}
 
 static void readBytes(std::ifstream &is, char *buffer, int length) {
   if (!is.read(buffer, length)) {
@@ -479,6 +491,7 @@ void handleClient(int client_fd, const std::string &dir,
               int curReplica = 0;
 
               for (int fd : replicaSockets) {
+                setRecvTimeout(fd, 10);
                 curReplica++;
                 // std::cout << "\nChecking the offset of replica socket number
                 // "
@@ -488,10 +501,7 @@ void handleClient(int client_fd, const std::string &dir,
                 // check whether the connection is closed by peeking at the top
                 // of the buffer
                 char buffer;
-                std::cout << "\nRECV val for replica " << curReplica << ": "
-                          << recv(fd, &buffer, 1, MSG_PEEK) << "!\n";
                 if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
-                  std::cout << "\nSkipping replica " << curReplica << "\n";
                   continue;
                 }
 
