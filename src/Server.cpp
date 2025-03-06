@@ -477,8 +477,9 @@ void handleClient(int client_fd, const std::string &dir,
               int syncedReplicas = 0;
 
               for (int fd : replicaSockets) {
-                std::cout << "\nChecking the offset of replica socket number "
-                          << fd << "\n";
+                // std::cout << "\nChecking the offset of replica socket number
+                // "
+                //           << fd << "\n";
                 send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
 
                 // check whether the connection is closed by peeking at the top
@@ -490,13 +491,14 @@ void handleClient(int client_fd, const std::string &dir,
 
                 ProtocolParser parser(fd);
                 RedisMessage offsetMessage = parser.parse();
-                std::cout << "\nFinished obtaining the message with the offset "
-                             "of replica socket number "
-                          << fd << "\n";
+                // std::cout << "\nFinished obtaining the message with the
+                // offset "
+                //              "of replica socket number "
+                //           << fd << "\n";
                 int offset = stoi(offsetMessage.elements[2].value);
-                std::cout << "\nReplica socket number " << fd
-                          << " gave the following offset value: "
-                          << std::to_string(offset) << "\n";
+                // std::cout << "\nReplica socket number " << fd
+                //           << " gave the following offset value: "
+                //           << std::to_string(offset) << "\n";
 
                 if (offset == master_repl_offset)
                   syncedReplicas++;
