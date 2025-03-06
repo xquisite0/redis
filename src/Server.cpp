@@ -285,6 +285,7 @@ void handleClient(int client_fd, const std::string &dir,
 
           for (int fd : replicaSockets) {
             send(fd, message.rawMessage.c_str(), message.rawMessage.size(), 0);
+            master_repl_offset += message.rawMessage.size();
           }
           std::cout << "\n\nSET KEY: " << message.elements[1].value
                     << " with VALUE: " << message.elements[2].value
@@ -453,9 +454,60 @@ void handleClient(int client_fd, const std::string &dir,
 
           replicaSockets.push_back(client_fd);
         } else if (command == "wait") {
-          std::string numreplicas = message.elements[1].value;
-          std::string timeout = message.elements[2].value;
-          response = ":" + std::to_string(replicaSockets.size()) + "\r\n";
+          int numreplicas = stoi(message.elements[1].value);
+          int timeout = stoi(message.elements[2].value);
+
+          auto now = std::chrono::system_clock::now();
+
+          // Convert to milliseconds since the Unix epoch
+          auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+              now.time_since_epoch());
+
+          // Get the Unix time in milliseconds
+          unsigned long long cur_time = duration.count();
+          unsigned long long timeoutTimestamp = cur_time + timeout;
+
+          if (master_repl_offset == 0) {
+            response = ":" + std::to_string(replicaSockets.size()) + "\r\n";
+          } else {
+            std::string offsetRequest =
+                "*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n";
+            while (true) {
+              int syncedReplicas = 0;
+
+              for (int fd : replicaSockets) {
+                send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
+                ProtocolParser parser(fd);
+                RedisMessage offsetMessage = parser.parse();
+                int offset = stoi(offsetMessage.elements[2].value);
+
+                if (offset == master_repl_offset)
+                  syncedReplicas++;
+              }
+
+              master_repl_offset += offsetRequest.size();
+
+              if (syncedReplicas >= numreplicas) {
+                response = ":" + std::to_string(syncedReplicas) + "\r\n";
+                break;
+              }
+
+              auto now = std::chrono::system_clock::now();
+
+              // Convert to milliseconds since the Unix epoch
+              auto duration =
+                  std::chrono::duration_cast<std::chrono::milliseconds>(
+                      now.time_since_epoch());
+
+              // Get the Unix time in milliseconds
+              unsigned long long cur_time = duration.count();
+
+              if (cur_time >= timeoutTimestamp) {
+                response = ":" + std::to_string(syncedReplicas) + "\r\n";
+                break;
+              }
+            }
+          }
         }
       }
     }
