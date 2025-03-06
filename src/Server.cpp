@@ -488,11 +488,11 @@ void handleClient(int client_fd, const std::string &dir,
             while (true) {
               int syncedReplicas = 0;
 
-              int curReplica = 0;
+              // int curReplica = 0;
 
               for (int fd : replicaSockets) {
                 setRecvTimeout(fd, 10);
-                curReplica++;
+                // curReplica++;
                 // std::cout << "\nChecking the offset of replica socket number
                 // "
                 //           << fd << "\n";
@@ -512,9 +512,9 @@ void handleClient(int client_fd, const std::string &dir,
                 //              "of replica socket number "
                 //           << fd << "\n";
                 int offset = stoi(offsetMessage.elements[2].value);
-                // std::cout << "\nReplica socket number " << fd
-                //           << " gave the following offset value: "
-                //           << std::to_string(offset) << "\n";
+                std::cout << "\nReplica socket number " << fd
+                          << " gave the following offset value: "
+                          << std::to_string(offset) << "\n";
 
                 if (offset == master_repl_offset)
                   syncedReplicas++;
