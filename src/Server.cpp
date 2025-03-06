@@ -476,7 +476,10 @@ void handleClient(int client_fd, const std::string &dir,
             while (true) {
               int syncedReplicas = 0;
 
+              int curReplica = 0;
+
               for (int fd : replicaSockets) {
+                curReplica++;
                 // std::cout << "\nChecking the offset of replica socket number
                 // "
                 //           << fd << "\n";
@@ -485,7 +488,7 @@ void handleClient(int client_fd, const std::string &dir,
                 // check whether the connection is closed by peeking at the top
                 // of the buffer
                 char buffer;
-                std::cout << "\nRECV val: "
+                std::cout << "\nRECV val for replica " << curReplica << ": "
                           << std::to_string(recv(fd, &buffer, 1, MSG_PEEK))
                           << "\n";
                 if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
