@@ -480,6 +480,14 @@ void handleClient(int client_fd, const std::string &dir,
                 std::cout << "\nChecking the offset of replica socket number "
                           << fd << "\n";
                 send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
+
+                // check whether the connection is closed by peeking at the top
+                // of the buffer
+                char buffer;
+                if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
+                  continue;
+                }
+
                 ProtocolParser parser(fd);
                 RedisMessage offsetMessage = parser.parse();
                 std::cout << "\nFinished obtaining the message with the offset "
