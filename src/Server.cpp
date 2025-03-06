@@ -494,7 +494,7 @@ void handleClient(int client_fd, const std::string &dir,
             // "\n";
 
             for (int fd : replicaSockets) {
-              setRecvTimeout(fd, 10);
+              setRecvTimeout(fd, 50);
               curReplica++;
               std::cout << "\nChecking the offset of replica socket number "
                         << curReplica << "\n";
