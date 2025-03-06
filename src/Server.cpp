@@ -497,6 +497,8 @@ void handleClient(int client_fd, const std::string &dir,
               send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
             }
 
+            std::this_thread::sleep_for(std::chrono::milliseconds(125));
+
             for (int fd : replicaSockets) {
               setRecvTimeout(fd, 125);
               curReplica++;
