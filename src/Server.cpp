@@ -455,7 +455,7 @@ void handleClient(int client_fd, const std::string &dir,
         } else if (command == "wait") {
           std::string numreplicas = message.elements[1].value;
           std::string timeout = message.elements[2].value;
-          response = ":0\r\n";
+          response = ":" + std::to_string(replicaSockets.size()) + "\r\n";
         }
       }
     }
