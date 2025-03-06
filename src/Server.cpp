@@ -504,6 +504,8 @@ void handleClient(int client_fd, const std::string &dir,
               // of the buffer
               char buffer;
               if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
+                std::cout << "\nWe are skipping replica socket number "
+                          << curReplica << "\n";
                 continue;
               }
 
