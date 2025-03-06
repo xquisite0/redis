@@ -492,6 +492,7 @@ void handleClient(int client_fd, const std::string &dir,
                           << std::to_string(recv(fd, &buffer, 1, MSG_PEEK))
                           << "\n";
                 if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
+                  std::cout << "\nSkipping replica " << curReplica << "\n";
                   continue;
                 }
 
