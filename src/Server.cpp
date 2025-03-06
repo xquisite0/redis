@@ -469,15 +469,16 @@ void handleClient(int client_fd, const std::string &dir,
           int numreplicas = stoi(message.elements[1].value);
           int timeout = stoi(message.elements[2].value);
 
-          auto now = std::chrono::system_clock::now();
+          // auto now = std::chrono::system_clock::now();
 
-          // Convert to milliseconds since the Unix epoch
-          auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-              now.time_since_epoch());
+          // // Convert to milliseconds since the Unix epoch
+          // auto duration =
+          // std::chrono::duration_cast<std::chrono::milliseconds>(
+          //     now.time_since_epoch());
 
-          // Get the Unix time in milliseconds
-          unsigned long long cur_time = duration.count();
-          unsigned long long timeoutTimestamp = cur_time + timeout;
+          // // Get the Unix time in milliseconds
+          // unsigned long long cur_time = duration.count();
+          // unsigned long long timeoutTimestamp = cur_time + timeout;
 
           if (master_repl_offset == 0) {
             response = ":" + std::to_string(replicaSockets.size()) + "\r\n";
@@ -485,65 +486,60 @@ void handleClient(int client_fd, const std::string &dir,
             std::string offsetRequest =
                 "*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n";
 
-            while (true) {
-              int syncedReplicas = 0;
+            // while (true) {
+            int syncedReplicas = 0;
 
-              // int curReplica = 0;
-              std::cout << "\nmaster_repl_offset " << master_repl_offset
-                        << "\n";
+            // int curReplica = 0;
+            std::cout << "\nmaster_repl_offset " << master_repl_offset << "\n";
 
-              for (int fd : replicaSockets) {
-                setRecvTimeout(fd, 100);
-                // curReplica++;
-                // std::cout << "\nChecking the offset of replica socket number
-                // "
-                //           << fd << "\n";
-                send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
+            for (int fd : replicaSockets) {
+              setRecvTimeout(fd, 100);
+              // curReplica++;
+              // std::cout << "\nChecking the offset of replica socket number
+              // "
+              //           << fd << "\n";
+              send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
 
-                // check whether the connection is closed by peeking at the top
-                // of the buffer
-                char buffer;
-                if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
-                  continue;
-                }
-
-                ProtocolParser parser(fd);
-                RedisMessage offsetMessage = parser.parse();
-                // std::cout << "\nFinished obtaining the message with the
-                // offset "
-                //              "of replica socket number "
-                //           << fd << "\n";
-                int offset = stoi(offsetMessage.elements[2].value);
-                std::cout << "\nReplica socket number " << fd
-                          << " gave the following offset value: "
-                          << std::to_string(offset) << "\n";
-
-                if (offset == master_repl_offset)
-                  syncedReplicas++;
+              // check whether the connection is closed by peeking at the top
+              // of the buffer
+              char buffer;
+              if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
+                continue;
               }
 
-              master_repl_offset += offsetRequest.size();
+              ProtocolParser parser(fd);
+              RedisMessage offsetMessage = parser.parse();
+              // std::cout << "\nFinished obtaining the message with the
+              // offset "
+              //              "of replica socket number "
+              //           << fd << "\n";
+              int offset = stoi(offsetMessage.elements[2].value);
+              std::cout << "\nReplica socket number " << fd
+                        << " gave the following offset value: "
+                        << std::to_string(offset) << "\n";
 
-              if (syncedReplicas >= numreplicas) {
-                response = ":" + std::to_string(syncedReplicas) + "\r\n";
-                break;
-              }
-
-              auto now = std::chrono::system_clock::now();
-
-              // Convert to milliseconds since the Unix epoch
-              auto duration =
-                  std::chrono::duration_cast<std::chrono::milliseconds>(
-                      now.time_since_epoch());
-
-              // Get the Unix time in milliseconds
-              unsigned long long cur_time = duration.count();
-
-              if (cur_time >= timeoutTimestamp) {
-                response = ":" + std::to_string(syncedReplicas) + "\r\n";
-                break;
-              }
+              if (offset == master_repl_offset)
+                syncedReplicas++;
             }
+
+            master_repl_offset += offsetRequest.size();
+
+            if (syncedReplicas >= numreplicas) {
+              response = ":" + std::to_string(syncedReplicas) + "\r\n";
+            }
+
+            // auto now = std::chrono::system_clock::now();
+
+            // // Convert to milliseconds since the Unix epoch
+            // auto duration =
+            //     std::chrono::duration_cast<std::chrono::milliseconds>(
+            //         now.time_since_epoch());
+
+            // // Get the Unix time in milliseconds
+            // unsigned long long cur_time = duration.count();
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(timeout)); // Sleep for 500ms
+            response = ":" + std::to_string(syncedReplicas) + "\r\n";
           }
         }
       }
