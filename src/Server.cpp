@@ -434,6 +434,8 @@ void handleClient(int client_fd, const std::string &dir,
               std::cout << "The offset value from replica is "
                         << std::to_string(offset) << "\n";
 
+              std::cout << "Master offset is " << master_repl_offset << "\n";
+
               if (offset == master_repl_offset) {
                 std::unique_lock<std::mutex> lock(mtx); // Lock the mutex
                 ++syncedReplicas;
