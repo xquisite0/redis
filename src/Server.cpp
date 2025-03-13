@@ -431,6 +431,8 @@ void handleClient(int client_fd, const std::string &dir,
             if (message.elements.size() >= 3 &&
                 message.elements[1].value == "ACK") {
               int offset = stoi(message.elements[2].value);
+              std::cout << "The offset value from replica is "
+                        << std::to_string(offset) << "\n";
 
               if (offset == master_repl_offset) {
                 std::unique_lock<std::mutex> lock(mtx); // Lock the mutex
