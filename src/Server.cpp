@@ -438,6 +438,8 @@ void handleClient(int client_fd, const std::string &dir,
                 std::unique_lock<std::mutex> lock(mtx); // Lock the mutex
                 ++syncedReplicas;
               }
+              std::cout << "Synced Replica count has updated to "
+                        << syncedReplicas << "\n";
             }
 
             /*
