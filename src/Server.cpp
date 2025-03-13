@@ -599,6 +599,14 @@ void handleClient(int client_fd, const std::string &dir,
             response = ":" + std::to_string(syncedReplicas) + "\r\n";
             master_repl_offset += offsetRequest.size();
           }
+        } else if (command == "type") {
+          std::string key = message.elements[1].value;
+
+          if (keyValue.find(key) == keyValue.end()) {
+            response = "+string\r\n";
+          } else {
+            response = "+none\r\n";
+          }
         }
       }
     }
