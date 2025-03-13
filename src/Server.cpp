@@ -22,6 +22,7 @@
 std::string master_replid = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
 int master_repl_offset = 0;
 std::vector<int> replicaSockets;
+std::unordered_map<std::string, std::string> keyStream;
 std::unordered_map<std::string, std::string> keyValue;
 bool propagated = false;
 int master_fd = -1;
@@ -602,10 +603,20 @@ void handleClient(int client_fd, const std::string &dir,
         } else if (command == "type") {
           std::string key = message.elements[1].value;
 
-          if (keyValue.find(key) != keyValue.end()) {
+          if (keyStream.find(key) != keyStream.end()) {
+            response = "+stream\r\n";
+          } else if (keyValue.find(key) != keyValue.end()) {
             response = "+string\r\n";
           } else {
             response = "+none\r\n";
+          }
+        } else if (command == "xadd") {
+          if (message.elements.size() >= 3) {
+            if (message.elements[1].value == "stream_key") {
+              std::string stream_key = message.elements[2].value;
+              response = "$" + std::to_string(stream_key.size()) + "\r\n" +
+                         stream_key + "\r\n";
+            }
           }
         }
       }
