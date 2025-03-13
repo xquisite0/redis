@@ -266,6 +266,8 @@ void handleClient(int client_fd, const std::string &dir,
 
     // check whether the connection is closed by peeking at the top of the
     // buffer
+    bool sendResponse = true;
+
     char buffer;
     if (recv(client_fd, &buffer, 1, MSG_PEEK) <= 0) {
       break;
@@ -424,12 +426,12 @@ void handleClient(int client_fd, const std::string &dir,
         } else if (command == "replconf") {
           // std::cout << "Ran\n";
           if (replicaof == "") {
-            // response = "+OK\r\n";
+            response = "+OK\r\n";
             std::cout << "Master has received the REPLCONF ACK message from "
                          "the replica\n";
-
             if (message.elements.size() >= 3 &&
                 message.elements[1].value == "ACK") {
+              sendResponse = false;
               int offset = stoi(message.elements[2].value);
               std::cout << "The offset value from replica is "
                         << std::to_string(offset) << "\n";
@@ -611,7 +613,7 @@ void handleClient(int client_fd, const std::string &dir,
     // propagated commands
     if (client_fd == master_fd) {
       replica_offset += message.rawMessage.size();
-    } else {
+    } else if (sendResponse) {
       send(client_fd, response.c_str(), response.size(), 0);
     }
     // }
