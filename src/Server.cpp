@@ -604,6 +604,7 @@ void handleClient(int client_fd, const std::string &dir,
 
     // if (!isPropagation) {
     std::cout << "\n\nSending: " << response << "\n\n";
+    std::cout << "Synced Replicas: " << syncedReplicas << "\n";
 
     // if we are a replica, with our current socket connected to the master for
     // propagated commands
