@@ -534,8 +534,7 @@ void handleClient(int client_fd, const std::string &dir,
             auto timeoutTimestamp = startTime + timeoutDuration;
 
             // Loop until the current time reaches the timeout
-            while (true ||
-                   std::chrono::steady_clock::now() < timeoutTimestamp) {
+            while (std::chrono::steady_clock::now() < timeoutTimestamp) {
               std::unique_lock<std::mutex> lock(mtx);
               if (syncedReplicas >= numreplicas)
                 break;
