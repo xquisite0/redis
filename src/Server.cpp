@@ -26,6 +26,8 @@ std::unordered_map<std::string, std::string> keyValue;
 bool propagated = false;
 int master_fd = -1;
 int replica_offset = 0;
+std::mutex mtx;
+int syncedReplicas = 0;
 
 void setRecvTimeout(int fd, int timeout_ms) {
   struct timeval tv;
@@ -423,6 +425,22 @@ void handleClient(int client_fd, const std::string &dir,
           std::cout << "Ran\n";
           if (replicaof == "") {
             response = "+OK\r\n";
+
+            if (message.elements.size() >= 3 &&
+                message.elements[1].value == "ACK") {
+              int offset = stoi(message.elements[2].value);
+
+              if (offset == master_repl_offset) {
+                std::unique_lock<std::mutex> lock(mtx); // Lock the mutex
+                ++syncedReplicas;
+              }
+            }
+
+            /*
+
+            include code here NA2. WAIT with multiple commands.
+
+            */
           } else {
             std::cout << "\nSize: " << message.elements.size() << "\n\n";
             if (message.elements.size() >= 3) {
@@ -487,54 +505,72 @@ void handleClient(int client_fd, const std::string &dir,
                 "*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n";
 
             // while (true) {
-            int syncedReplicas = 0;
+            std::unique_lock<std::mutex> lock(mtx);
+            syncedReplicas = 0;
+            lock.unlock();
 
-            int curReplica = 0;
+            // int curReplica = 0;
             // std::cout << "\nmaster_repl_offset " << master_repl_offset <<
             // "\n";
 
             for (int fd : replicaSockets) {
               send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
             }
+            master_repl_offset += offsetRequest.size();
+
+            auto startTime = std::chrono::steady_clock::now();
+
+            // Define timeout duration (e.g., 5000 milliseconds = 5 seconds)
+            std::chrono::milliseconds timeoutDuration(timeout);
+
+            // Calculate the timeout timestamp
+            auto timeoutTimestamp = startTime + timeoutDuration;
+
+            // Loop until the current time reaches the timeout
+            while (std::chrono::steady_clock::now() < timeoutTimestamp) {
+              std::unique_lock<std::mutex> lock(mtx);
+              if (syncedReplicas >= numreplicas)
+                break;
+              std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            }
 
             // std::this_thread::sleep_for(std::chrono::milliseconds(125));
 
-            for (int fd : replicaSockets) {
-              setRecvTimeout(fd, 250);
-              curReplica++;
-              std::cout << "\nChecking the offset of replica socket number "
-                        << curReplica << "\n";
+            // for (int fd : replicaSockets) {
+            //   setRecvTimeout(fd, 250);
+            //   curReplica++;
+            //   std::cout << "\nChecking the offset of replica socket number "
+            //             << curReplica << "\n";
 
-              std::cout << "\n" << curReplica << ": Sent offset request\n";
+            //   std::cout << "\n" << curReplica << ": Sent offset request\n";
 
-              // check whether the connection is closed by peeking at the top
-              // of the buffer
-              char buffer;
-              if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
-                std::cout << "\nWe are skipping replica socket number "
-                          << curReplica << "\n";
-                continue;
-              }
+            //   // check whether the connection is closed by peeking at the top
+            //   // of the buffer
+            //   char buffer;
+            //   if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
+            //     std::cout << "\nWe are skipping replica socket number "
+            //               << curReplica << "\n";
+            //     continue;
+            //   }
 
-              ProtocolParser parser(fd);
-              RedisMessage offsetMessage = parser.parse();
-              std::cout << "\nFinished obtaining the message with the offset "
-                           "of replica socket number "
-                        << curReplica << "\n";
-              int offset = stoi(offsetMessage.elements[2].value);
-              std::cout << "\nReplica socket number " << fd
-                        << " gave the following offset value: "
-                        << std::to_string(offset) << "\n";
+            //   ProtocolParser parser(fd);
+            //   RedisMessage offsetMessage = parser.parse();
+            //   std::cout << "\nFinished obtaining the message with the offset
+            //   "
+            //                "of replica socket number "
+            //             << curReplica << "\n";
+            //   int offset = stoi(offsetMessage.elements[2].value);
+            //   std::cout << "\nReplica socket number " << fd
+            //             << " gave the following offset value: "
+            //             << std::to_string(offset) << "\n";
 
-              if (offset == master_repl_offset)
-                syncedReplicas++;
-            }
+            //   if (offset == master_repl_offset)
+            //     syncedReplicas++;
+            // }
 
-            master_repl_offset += offsetRequest.size();
-
-            if (syncedReplicas >= numreplicas) {
-              response = ":" + std::to_string(syncedReplicas) + "\r\n";
-            }
+            // if (syncedReplicas >= numreplicas) {
+            //   response = ":" + std::to_string(syncedReplicas) + "\r\n";
+            // }
 
             // auto now = std::chrono::system_clock::now();
 
@@ -545,8 +581,9 @@ void handleClient(int client_fd, const std::string &dir,
 
             // // Get the Unix time in milliseconds
             // unsigned long long cur_time = duration.count();
-            std::this_thread::sleep_for(
-                std::chrono::milliseconds(timeout)); // Sleep for 500ms
+            // std::this_thread::sleep_for(
+            //     std::chrono::milliseconds(timeout)); // Sleep for 500ms
+            lock.lock();
             response = ":" + std::to_string(syncedReplicas) + "\r\n";
           }
         }
