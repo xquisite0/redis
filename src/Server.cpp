@@ -601,6 +601,7 @@ void handleClient(int client_fd, const std::string &dir,
           }
         } else if (command == "type") {
           std::string key = message.elements[1].value;
+          std::cout << "Key given in TYPE command: " << key << "\n";
 
           if (keyValue.find(key) == keyValue.end()) {
             response = "+string\r\n";
