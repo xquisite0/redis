@@ -422,9 +422,11 @@ void handleClient(int client_fd, const std::string &dir,
             response = "$10\r\nrole:slave\r\n";
           }
         } else if (command == "replconf") {
-          std::cout << "Ran\n";
+          // std::cout << "Ran\n";
           if (replicaof == "") {
             response = "+OK\r\n";
+            std::cout << "Master has received the REPLCONF ACK message from "
+                         "the replica\n";
 
             if (message.elements.size() >= 3 &&
                 message.elements[1].value == "ACK") {
