@@ -424,7 +424,7 @@ void handleClient(int client_fd, const std::string &dir,
         } else if (command == "replconf") {
           // std::cout << "Ran\n";
           if (replicaof == "") {
-            response = "+OK\r\n";
+            // response = "+OK\r\n";
             std::cout << "Master has received the REPLCONF ACK message from "
                          "the replica\n";
 
@@ -513,10 +513,10 @@ void handleClient(int client_fd, const std::string &dir,
                 "*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n";
 
             // while (true) {
-            if (true) {
-              std::unique_lock<std::mutex> lock(mtx);
-              syncedReplicas = 0;
-            }
+            // if (true) {
+            std::unique_lock<std::mutex> lock(mtx);
+            syncedReplicas = 0;
+            // }
 
             // int curReplica = 0;
             // std::cout << "\nmaster_repl_offset " << master_repl_offset <<
@@ -592,7 +592,7 @@ void handleClient(int client_fd, const std::string &dir,
             // unsigned long long cur_time = duration.count();
             // std::this_thread::sleep_for(
             //     std::chrono::milliseconds(timeout)); // Sleep for 500ms
-            // lock.lock();
+            lock.lock();
             response = ":" + std::to_string(syncedReplicas) + "\r\n";
             master_repl_offset += offsetRequest.size();
           }
