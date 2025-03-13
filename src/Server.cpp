@@ -518,6 +518,7 @@ void handleClient(int client_fd, const std::string &dir,
             // if (true) {
             std::unique_lock<std::mutex> lock(mtx);
             syncedReplicas = 0;
+            lock.unlock();
             // }
 
             // int curReplica = 0;
@@ -594,7 +595,7 @@ void handleClient(int client_fd, const std::string &dir,
             // unsigned long long cur_time = duration.count();
             // std::this_thread::sleep_for(
             //     std::chrono::milliseconds(timeout)); // Sleep for 500ms
-            // lock.lock();
+            lock.lock();
             response = ":" + std::to_string(syncedReplicas) + "\r\n";
             master_repl_offset += offsetRequest.size();
           }
