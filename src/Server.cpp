@@ -602,9 +602,9 @@ void handleClient(int client_fd, const std::string &dir,
     // std::string response = "+PONG\r\n";
     // std::cout << "\nResponse to send: " << response << "\n";
 
-    // if (!isPropagation) {
-    std::cout << "\n\nSending: " << response << "\n\n";
+    // if (!isPropagation) {s
     std::cout << "Synced Replicas: " << syncedReplicas << "\n";
+    std::cout << "\n\nSending: " << response << "\n\n";
 
     // if we are a replica, with our current socket connected to the master for
     // propagated commands
