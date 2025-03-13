@@ -612,11 +612,9 @@ void handleClient(int client_fd, const std::string &dir,
           }
         } else if (command == "xadd") {
           if (message.elements.size() >= 3) {
-            if (message.elements[1].value == "stream_key") {
-              std::string stream_key = message.elements[2].value;
-              response = "$" + std::to_string(stream_key.size()) + "\r\n" +
-                         stream_key + "\r\n";
-            }
+            std::string stream_key = message.elements[2].value;
+            response = "$" + std::to_string(stream_key.size()) + "\r\n" +
+                       stream_key + "\r\n";
           }
         }
       }
