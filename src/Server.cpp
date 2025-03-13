@@ -513,9 +513,10 @@ void handleClient(int client_fd, const std::string &dir,
                 "*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n";
 
             // while (true) {
-            std::unique_lock<std::mutex> lock(mtx);
-            syncedReplicas = 0;
-            lock.unlock();
+            if (true) {
+              std::unique_lock<std::mutex> lock(mtx);
+              syncedReplicas = 0;
+            }
 
             // int curReplica = 0;
             // std::cout << "\nmaster_repl_offset " << master_repl_offset <<
