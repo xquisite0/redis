@@ -539,6 +539,7 @@ void handleClient(int client_fd, const std::string &dir,
               std::unique_lock<std::mutex> lock(mtx);
               if (syncedReplicas >= numreplicas)
                 break;
+              lock.unlock();
               std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
 
@@ -603,7 +604,7 @@ void handleClient(int client_fd, const std::string &dir,
     // std::cout << "\nResponse to send: " << response << "\n";
 
     // if (!isPropagation) {s
-    std::cout << "Synced Replicas: " << syncedReplicas << "\n";
+    // std::cout << "Synced Replicas: " << syncedReplicas << "\n";
     std::cout << "\n\nSending: " << response << "\n\n";
 
     // if we are a replica, with our current socket connected to the master for
