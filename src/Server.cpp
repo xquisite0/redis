@@ -524,7 +524,6 @@ void handleClient(int client_fd, const std::string &dir,
             for (int fd : replicaSockets) {
               send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
             }
-            master_repl_offset += offsetRequest.size();
 
             auto startTime = std::chrono::steady_clock::now();
 
@@ -593,6 +592,7 @@ void handleClient(int client_fd, const std::string &dir,
             //     std::chrono::milliseconds(timeout)); // Sleep for 500ms
             lock.lock();
             response = ":" + std::to_string(syncedReplicas) + "\r\n";
+            master_repl_offset += offsetRequest.size();
           }
         }
       }
