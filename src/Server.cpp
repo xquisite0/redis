@@ -993,8 +993,10 @@ void handleClient(int client_fd, const std::string &dir,
     if (transactionExecuting) {
       response = "*" + std::to_string(transactionResponses.size()) + "\r\n";
       for (std::string &transactionResponse : transactionResponses) {
-        response += "$" + std::to_string(transactionResponse.size()) + "\r\n" +
-                    transactionResponse + "\r\n";
+        response += transactionResponse;
+        // response += "$" + std::to_string(transactionResponse.size()) + "\r\n"
+        // +
+        //             transactionResponse + "\r\n";
       }
       transactionExecuting = false;
     }
