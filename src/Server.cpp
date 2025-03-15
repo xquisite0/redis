@@ -884,6 +884,10 @@ void handleClient(int client_fd, const std::string &dir,
           std::string key = message.elements[1].value;
 
           // extract value
+          if (keyValue.find(key) == keyValue.end()) {
+            keyValue[key] = "0";
+          }
+
           std::string curValueString = keyValue[key];
           int curValue = std::stoi(curValueString);
 
