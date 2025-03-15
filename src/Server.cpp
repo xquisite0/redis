@@ -41,9 +41,6 @@ int syncedReplicas = 0;
 long long maxMillisecondsTime = 0;
 int maxSequenceNumber = 1;
 
-bool transactionInProgress = false;
-std::vector<std::string> transactionCommands;
-
 void setRecvTimeout(int fd, int timeout_ms) {
   struct timeval tv;
   tv.tv_sec = timeout_ms / 1000;           // Convert milliseconds to seconds
@@ -300,6 +297,9 @@ void handleClient(int client_fd, const std::string &dir,
   //   std::this_thread::sleep_for(std::chrono::seconds(1));
   // }
   std::unordered_map<std::string, unsigned long long> keyStartExpiry;
+
+  bool transactionInProgress = false;
+  std::vector<std::string> transactionCommands;
 
   // restore state of Redis with persistence.
   parseRDB(keyValue, keyStartExpiry, dir, dbfilename);
