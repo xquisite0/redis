@@ -776,6 +776,61 @@ void handleClient(int client_fd, const std::string &dir,
                   "$" + std::to_string(elem.size()) + "\r\n" + elem + "\r\n";
             }
           }
+        } else if (command == "xread") {
+          std::vector<std::pair<std::string, std::string>> stream_keys_start;
+          int stream_count = (message.elements.size() - 2) / 2;
+          for (int i = 2; i < 2 + stream_count; i++) {
+            stream_keys_start.push_back(std::make_pair(
+                message.elements[i].value, message.elements[stream_count + i]));
+          }
+          std::vector<std::pair<
+              std::string,
+              std::vector<std::pair<std::string, std::vector<std::string>>>>>
+              streamsToOutput;
+          for (auto &[stream_key, start] : stream_keys_start) {
+            auto [startMillisecondsTime, startSequenceNumber] =
+                extractMillisecondsAndSequence(start, stream_key);
+            std::pair<
+                std::string,
+                std::vector<std::pair<std::string, std::vector<std::string>>>>
+                curStream;
+            curStream.first = stream_key;
+
+            for (auto &entry : streams[stream_key]) {
+              auto [entry_id, keyValuePairs] = entry;
+              auto [curMillisecondsTime, curSequenceNumber] =
+                  extractMillisecondsAndSequence(entry_id, stream_key);
+
+              bool afterStart = startMillisecondsTime < curMillisecondsTime ||
+                                (startMillisecondsTime == curMillisecondsTime &&
+                                 startSequenceNumber < curSequenceNumber);
+
+              if (afterStart) {
+                curStream.second.push_back(entry);
+              }
+            }
+            streamsToOutput.push_back(curStream);
+          }
+
+          response = "*" + std::to_string(streamsToOutput.size()) + "\r\n";
+          for (auto &[stream_key, entries] : streamsToOutput) {
+            response += "*2\r\n";
+            response += "$" + std::to_string(stream_key.size()) + "\r\n" +
+                        stream_key + "\r\n";
+
+            response += "*" + std::to_string(entries.size()) + "\r\n";
+            for (auto &[entry_id, keyValuePairs] : entries) {
+              response += "*2\r\n";
+              response += "$" + std::to_string(entry_id.size()) + "\r\n" +
+                          entry_id + "\r\n";
+              response += "*" + std::to_string(keyValuePairs.size()) + "\r\n";
+
+              for (auto &elem : keyValuePairs) {
+                response +=
+                    "$" + std::to_string(elem.size()) + "\r\n" + elem + "\r\n";
+              }
+            }
+          }
         }
       }
     }
