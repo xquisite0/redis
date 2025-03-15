@@ -361,6 +361,7 @@ void handleClient(int client_fd, const std::string &dir,
         } else {
           if (transactionCommands.empty()) {
             response = "*0\r\n";
+            transactionBegun = false;
             send(client_fd, response.c_str(), response.size(), 0);
           }
         }
