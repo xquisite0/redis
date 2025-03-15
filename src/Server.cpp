@@ -41,6 +41,9 @@ int syncedReplicas = 0;
 long long maxMillisecondsTime = 0;
 int maxSequenceNumber = 1;
 
+bool transactionInProgress = false;
+std::vector<std::string> transactionCommands;
+
 void setRecvTimeout(int fd, int timeout_ms) {
   struct timeval tv;
   tv.tv_sec = timeout_ms / 1000;           // Convert milliseconds to seconds
@@ -336,6 +339,17 @@ void handleClient(int client_fd, const std::string &dir,
     parser.reset();
     RedisMessage message = parser.parse();
     std::cout << "Message: \n" << message.rawMessage << "\n";
+
+    if (transactionInProgress) {
+      std::string command = "";
+      for (char &c : message.elements[0].value) {
+        command += tolower(c);
+      }
+      if (command != "exec") {
+        transactionCommands.push_back(message.rawMessage);
+        continue;
+      }
+    }
 
     std::string response;
 
@@ -911,9 +925,16 @@ void handleClient(int client_fd, const std::string &dir,
             response = ":" + curValueString + "\r\n";
           }
         } else if (command == "multi") {
+          transactionInProgress = true;
           response = "+OK\r\n";
         } else if (command == "exec") {
-          response = "-ERR EXEC without MULTI\r\n";
+          if (!transactionInProgress) {
+            response = "-ERR EXEC without MULTI\r\n";
+          } else {
+            if (transactionCommands.empty()) {
+              response = "*0\r\n";
+            }
+          }
         }
       }
     }
