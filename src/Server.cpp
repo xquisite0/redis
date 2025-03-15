@@ -38,6 +38,8 @@ int master_fd = -1;
 int replica_offset = 0;
 std::mutex mtx;
 int syncedReplicas = 0;
+long long maxMillisecondsTime = 0;
+int maxSequenceNumber = 1;
 
 void setRecvTimeout(int fd, int timeout_ms) {
   struct timeval tv;
@@ -707,6 +709,14 @@ void handleClient(int client_fd, const std::string &dir,
               entry_id = std::to_string(millisecondsTime) + "-" +
                          std::to_string(sequenceNumber);
 
+              if (maxMillisecondsTime > millisecondsTime) {
+                maxMillisecondsTime = millisecondsTime;
+                maxSequenceNumber = sequenceNumber;
+              } else if (maxMillisecondsTime == millisecondsTime &&
+                         sequenceNumber > maxSequenceNumber) {
+                maxSequenceNumber = sequenceNumber;
+              }
+
               std::pair<std::string, std::vector<std::string>> entry;
               entry.first = entry_id;
               for (int i = 3; i < message.elements.size(); i++) {
@@ -813,12 +823,8 @@ void handleClient(int client_fd, const std::string &dir,
             for (auto &[stream_key, start] : stream_keys_start) {
 
               if (start == "$") {
-                auto now = std::chrono::system_clock::now();
-                auto unix_timestamp =
-                    std::chrono::duration_cast<std::chrono::seconds>(
-                        now.time_since_epoch())
-                        .count();
-                start = std::to_string(unix_timestamp) + "-0";
+                start = std::to_string(maxMillisecondsTime) + "-" +
+                        std::to_string(maxSequenceNumber + 1);
               }
 
               auto [startMillisecondsTime, startSequenceNumber] =
