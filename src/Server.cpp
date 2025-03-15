@@ -355,16 +355,16 @@ void handleClient(int client_fd, const std::string &dir,
         send(client_fd, response.c_str(), response.size(), 0);
         continue;
       } else {
-        if (!transactionBegun) {
-          response = "-ERR EXEC without MULTI\r\n";
+        // if (!transactionBegun) {
+        //   response = "-ERR EXEC without MULTI\r\n";
+        //   send(client_fd, response.c_str(), response.size(), 0);
+        // } else {
+        if (transactionCommands.empty()) {
+          response = "*0\r\n";
+          transactionBegun = false;
           send(client_fd, response.c_str(), response.size(), 0);
-        } else {
-          if (transactionCommands.empty()) {
-            response = "*0\r\n";
-            transactionBegun = false;
-            send(client_fd, response.c_str(), response.size(), 0);
-          }
         }
+
         transactionExecuting = true;
       }
     }
@@ -962,255 +962,262 @@ void handleClient(int client_fd, const std::string &dir,
           } else if (command == "multi") {
             transactionBegun = true;
             response = "+OK\r\n";
+          } else if (command == "exec") {
+            if (!transactionBegun) {
+              response = "-ERR EXEC without MULTI\r\n";
+              send(client_fd, response.c_str(), response.size(), 0);
+            } else {
+            }
+            // else if (command == "exec") {
+            //   if (!transactionBegun) {
+            //     response = "-ERR EXEC without MULTI\r\n";
+            //   } else {
+            //     if (transactionCommands.empty()) {
+            //       response = "*0\r\n";
+            //     }
+            //   }
+            //   transactionBegun = false;
+            // }
           }
-          // else if (command == "exec") {
-          //   if (!transactionBegun) {
-          //     response = "-ERR EXEC without MULTI\r\n";
-          //   } else {
-          //     if (transactionCommands.empty()) {
-          //       response = "*0\r\n";
-          //     }
-          //   }
-          //   transactionBegun = false;
-          // }
+        }
+
+        if (client_fd == master_fd) {
+          replica_offset += message.rawMessage.size();
+        }
+        if (transactionExecuting) {
+          std::cout << "This is a transaction response number "
+                    << transactionNumber << ". Response: " << response << "\n";
+          transactionResponses.push_back(response);
         }
       }
+      while (transactionExecuting &&
+             transactionNumber < transactionCommands.size())
+        ;
 
-      if (client_fd == master_fd) {
-        replica_offset += message.rawMessage.size();
-      }
+      // std::string response = "+PONG\r\n";
+      // std::cout << "\nResponse to send: " << response << "\n";
+
+      // if (!isPropagation) {s
+      // std::cout << "Synced Replicas: " << syncedReplicas << "\n";
+
+      // if we are a replica, with our current socket connected to the master
+      // for propagated commands
+      // if (client_fd == master_fd) {
+      //   replica_offset += message.rawMessage.size();
+      // } else if (sendResponse) {
+      //   send(client_fd, response.c_str(), response.size(), 0);
+      // }
       if (transactionExecuting) {
-        std::cout << "This is a transaction response number "
-                  << transactionNumber << ". Response: " << response << "\n";
-        transactionResponses.push_back(response);
+        response = "*" + std::to_string(transactionResponses.size()) + "\r\n";
+        for (std::string &transactionResponse : transactionResponses) {
+          response += transactionResponse;
+          // response += "$" + std::to_string(transactionResponse.size()) +
+          // "\r\n"
+          // +
+          //             transactionResponse + "\r\n";
+        }
+        transactionExecuting = false;
+        transactionBegun = false;
       }
 
-    } while (transactionExecuting &&
-             transactionNumber < transactionCommands.size());
-
-    // std::string response = "+PONG\r\n";
-    // std::cout << "\nResponse to send: " << response << "\n";
-
-    // if (!isPropagation) {s
-    // std::cout << "Synced Replicas: " << syncedReplicas << "\n";
-
-    // if we are a replica, with our current socket connected to the master
-    // for propagated commands
-    // if (client_fd == master_fd) {
-    //   replica_offset += message.rawMessage.size();
-    // } else if (sendResponse) {
-    //   send(client_fd, response.c_str(), response.size(), 0);
-    // }
-    if (transactionExecuting) {
-      response = "*" + std::to_string(transactionResponses.size()) + "\r\n";
-      for (std::string &transactionResponse : transactionResponses) {
-        response += transactionResponse;
-        // response += "$" + std::to_string(transactionResponse.size()) + "\r\n"
-        // +
-        //             transactionResponse + "\r\n";
+      std::cout << "\n\nSending: " << response << "\n\n";
+      if (client_fd != master_fd && sendResponse) {
+        send(client_fd, response.c_str(), response.size(), 0);
       }
-      transactionExecuting = false;
-      transactionBegun = false;
+
+      // }
+
+      // if (isPropagation && replicaof != "") {
+      //   propagated = true;
+      // }
+    }
+    close(client_fd);
+  }
+
+  void executeHandshake(const std::string &dir, const std::string &dbfilename,
+                        int port, std::string replicaof) {
+    std::string master_host_string = replicaof.substr(0, replicaof.find(' '));
+    if (master_host_string == "localhost") {
+      master_host_string = "127.0.0.1";
+    }
+    in_addr_t MASTER_HOST = inet_addr(master_host_string.c_str());
+    std::string master_port_string = replicaof.substr(replicaof.find(' ') + 1);
+    int MASTER_PORT = stoi(master_port_string);
+    std::cout << "\nMASTER_HOST & PORT " << master_host_string << " "
+              << MASTER_PORT << "\n";
+
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    master_fd = clientSocket;
+    std::cout << "Client Socket value: " << clientSocket << "\n";
+
+    struct sockaddr_in master_addr;
+    master_addr.sin_family = AF_INET;
+    master_addr.sin_addr.s_addr = MASTER_HOST;
+    std::cout << "\nPort of Master " << MASTER_PORT << "\n";
+    master_addr.sin_port = htons(MASTER_PORT);
+
+    if (connect(clientSocket, (struct sockaddr *)&master_addr,
+                sizeof(master_addr)) < 0) {
+      perror("Connection failed");
+      close(clientSocket);
+      return;
+    }
+    // std::cout << "\n\nReplica connected to Master\n\n";
+
+    std::string message = "*1\r\n$4\r\nPING\r\n";
+
+    // Send PING message
+    send(clientSocket, message.c_str(), message.size(), 0);
+    // std::cout << "\n\nMessage sent to Master\n\n";
+
+    std::string response = receiveResponse(clientSocket);
+    // std::cout << "\n\nResponse received: " << response << "\n\n";
+
+    message = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$" +
+              std::to_string(std::to_string(port).size()) + "\r\n" +
+              std::to_string(port) + "\r\n";
+
+    send(clientSocket, message.c_str(), message.size(), 0);
+    response = receiveResponse(clientSocket);
+    // std::cout << "\n\n OK1: " << response << "\n\n";
+
+    message = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
+
+    send(clientSocket, message.c_str(), message.size(), 0);
+
+    response = receiveResponse(clientSocket);
+    // std::cout << "\n\n OK2: " << response << "\n\n";
+
+    message = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
+
+    send(clientSocket, message.c_str(), message.size(), 0);
+
+    // extract RDB File
+    // char buffer[1024]
+    // int bytesRead = read(clientSocket, buffer, sizeof(buffer));
+    ProtocolParser parser(clientSocket);
+
+    // should be the fullresync message
+    RedisMessage parsedResponse = parser.parse();
+    // std::cout << "First Message: \n " << parsedResponse.rawMessage << "\n\n";
+
+    // should be the RDB file
+    parser.reset();
+    parser.isRDB = true;
+    parsedResponse = parser.parse();
+    parser.isRDB = false;
+    // std::cout << "Second message: \n" << parsedResponse.rawMessage << "\n";
+
+    // response = receiveResponse(clientSocket);
+    // std::cout
+    //     << "\n\n 1Hi there! Here's the RDB response (checking if replconf "
+    //        "cmmnd is here): "
+    //     << response << std::endl;
+    // response = receiveResponse(clientSocket);
+    // std::cout << "\n\n Hi there! Here's the RDB response (checking if
+    // replconf "
+    //              "cmmnd is here): "
+    //           << response << std::endl;
+
+    // handleClient(clientSocket, dir, dbfilename, port, replicaof);
+    // close(clientSocket);
+    std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof,
+                true)
+        .detach();
+    // handleClient(clientSocket, dir, dbfilename, port, replicaof);
+  }
+
+  int main(int argc, char **argv) {
+    // Flush after every std::cout / std::cerr
+    std::cout << std::unitbuf;
+    std::cerr << std::unitbuf;
+
+    std::string dir = "";
+    std::string dbfilename = "";
+    int port = 6379;
+    std::string replicaof = "";
+
+    for (int i = 1; i < argc; i++) {
+      if (std::string(argv[i]) == "--dir") {
+        dir = argv[i + 1];
+      }
+      if (std::string(argv[i]) == "--dbfilename") {
+        dbfilename = argv[i + 1];
+      }
+      if (std::string(argv[i]) == "--port") {
+        port = stoi(std::string(argv[i + 1]));
+      }
+      if (std::string(argv[i]) == "--replicaof") {
+        replicaof = std::string(argv[i + 1]);
+      }
     }
 
-    std::cout << "\n\nSending: " << response << "\n\n";
-    if (client_fd != master_fd && sendResponse) {
-      send(client_fd, response.c_str(), response.size(), 0);
+    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0) {
+      std::cerr << "Failed to create server socket\n";
+      return 1;
     }
 
-    // }
-
-    // if (isPropagation && replicaof != "") {
-    //   propagated = true;
-    // }
-  }
-  close(client_fd);
-}
-
-void executeHandshake(const std::string &dir, const std::string &dbfilename,
-                      int port, std::string replicaof) {
-  std::string master_host_string = replicaof.substr(0, replicaof.find(' '));
-  if (master_host_string == "localhost") {
-    master_host_string = "127.0.0.1";
-  }
-  in_addr_t MASTER_HOST = inet_addr(master_host_string.c_str());
-  std::string master_port_string = replicaof.substr(replicaof.find(' ') + 1);
-  int MASTER_PORT = stoi(master_port_string);
-  std::cout << "\nMASTER_HOST & PORT " << master_host_string << " "
-            << MASTER_PORT << "\n";
-
-  int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-  master_fd = clientSocket;
-  std::cout << "Client Socket value: " << clientSocket << "\n";
-
-  struct sockaddr_in master_addr;
-  master_addr.sin_family = AF_INET;
-  master_addr.sin_addr.s_addr = MASTER_HOST;
-  std::cout << "\nPort of Master " << MASTER_PORT << "\n";
-  master_addr.sin_port = htons(MASTER_PORT);
-
-  if (connect(clientSocket, (struct sockaddr *)&master_addr,
-              sizeof(master_addr)) < 0) {
-    perror("Connection failed");
-    close(clientSocket);
-    return;
-  }
-  // std::cout << "\n\nReplica connected to Master\n\n";
-
-  std::string message = "*1\r\n$4\r\nPING\r\n";
-
-  // Send PING message
-  send(clientSocket, message.c_str(), message.size(), 0);
-  // std::cout << "\n\nMessage sent to Master\n\n";
-
-  std::string response = receiveResponse(clientSocket);
-  // std::cout << "\n\nResponse received: " << response << "\n\n";
-
-  message = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$" +
-            std::to_string(std::to_string(port).size()) + "\r\n" +
-            std::to_string(port) + "\r\n";
-
-  send(clientSocket, message.c_str(), message.size(), 0);
-  response = receiveResponse(clientSocket);
-  // std::cout << "\n\n OK1: " << response << "\n\n";
-
-  message = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
-
-  send(clientSocket, message.c_str(), message.size(), 0);
-
-  response = receiveResponse(clientSocket);
-  // std::cout << "\n\n OK2: " << response << "\n\n";
-
-  message = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
-
-  send(clientSocket, message.c_str(), message.size(), 0);
-
-  // extract RDB File
-  // char buffer[1024]
-  // int bytesRead = read(clientSocket, buffer, sizeof(buffer));
-  ProtocolParser parser(clientSocket);
-
-  // should be the fullresync message
-  RedisMessage parsedResponse = parser.parse();
-  // std::cout << "First Message: \n " << parsedResponse.rawMessage << "\n\n";
-
-  // should be the RDB file
-  parser.reset();
-  parser.isRDB = true;
-  parsedResponse = parser.parse();
-  parser.isRDB = false;
-  // std::cout << "Second message: \n" << parsedResponse.rawMessage << "\n";
-
-  // response = receiveResponse(clientSocket);
-  // std::cout
-  //     << "\n\n 1Hi there! Here's the RDB response (checking if replconf "
-  //        "cmmnd is here): "
-  //     << response << std::endl;
-  // response = receiveResponse(clientSocket);
-  // std::cout << "\n\n Hi there! Here's the RDB response (checking if
-  // replconf "
-  //              "cmmnd is here): "
-  //           << response << std::endl;
-
-  // handleClient(clientSocket, dir, dbfilename, port, replicaof);
-  // close(clientSocket);
-  std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof,
-              true)
-      .detach();
-  // handleClient(clientSocket, dir, dbfilename, port, replicaof);
-}
-
-int main(int argc, char **argv) {
-  // Flush after every std::cout / std::cerr
-  std::cout << std::unitbuf;
-  std::cerr << std::unitbuf;
-
-  std::string dir = "";
-  std::string dbfilename = "";
-  int port = 6379;
-  std::string replicaof = "";
-
-  for (int i = 1; i < argc; i++) {
-    if (std::string(argv[i]) == "--dir") {
-      dir = argv[i + 1];
-    }
-    if (std::string(argv[i]) == "--dbfilename") {
-      dbfilename = argv[i + 1];
-    }
-    if (std::string(argv[i]) == "--port") {
-      port = stoi(std::string(argv[i + 1]));
-    }
-    if (std::string(argv[i]) == "--replicaof") {
-      replicaof = std::string(argv[i + 1]);
-    }
-  }
-
-  int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-  if (server_fd < 0) {
-    std::cerr << "Failed to create server socket\n";
-    return 1;
-  }
-
-  // Since the tester restarts your program quite often, setting SO_REUSEADDR
-  // ensures that we don't run into 'Address already in use' errors
-  int reuse = 1;
-  if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) <
-      0) {
-    std::cerr << "setsockopt failed\n";
-    return 1;
-  }
-
-  struct sockaddr_in server_addr;
-  server_addr.sin_family = AF_INET;
-  server_addr.sin_addr.s_addr = INADDR_ANY;
-  server_addr.sin_port = htons(port);
-
-  if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) !=
-      0) {
-    std::cerr << "Failed to bind to port " << port << "\n";
-    return 1;
-  }
-
-  // bind to master
-  int clientSocket = -1;
-  if (replicaof != "") {
-    std::thread(executeHandshake, dir, dbfilename, port, replicaof).detach();
-  }
-
-  int connection_backlog = 5;
-  if (listen(server_fd, connection_backlog) != 0) {
-    std::cerr << "listen failed\n";
-    return 1;
-  }
-
-  struct sockaddr_in client_addr;
-  int client_addr_len = sizeof(client_addr);
-  std::cout << "Waiting for a client to connect...\n";
-
-  // You can use print statements as follows for debugging, they'll be visible
-  // when running tests.
-  std::cout << "Logs from your program will appear here!\n";
-
-  // Uncomment this block to pass the first stage
-
-  // accept(server_fd, (struct sockaddr *)&client_addr,
-  //        (socklen_t *)&client_addr_len);
-  while (true) {
-    int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
-                           (socklen_t *)&client_addr_len);
-
-    if (client_fd >= 0) {
-      std::thread(handleClient, client_fd, dir, dbfilename, port, replicaof,
-                  false)
-          .detach();
+    // Since the tester restarts your program quite often, setting SO_REUSEADDR
+    // ensures that we don't run into 'Address already in use' errors
+    int reuse = 1;
+    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) <
+        0) {
+      std::cerr << "setsockopt failed\n";
+      return 1;
     }
 
-    std::cout << "Client connected\n" << client_fd;
+    struct sockaddr_in server_addr;
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(port);
+
+    if (bind(server_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) !=
+        0) {
+      std::cerr << "Failed to bind to port " << port << "\n";
+      return 1;
+    }
+
+    // bind to master
+    int clientSocket = -1;
+    if (replicaof != "") {
+      std::thread(executeHandshake, dir, dbfilename, port, replicaof).detach();
+    }
+
+    int connection_backlog = 5;
+    if (listen(server_fd, connection_backlog) != 0) {
+      std::cerr << "listen failed\n";
+      return 1;
+    }
+
+    struct sockaddr_in client_addr;
+    int client_addr_len = sizeof(client_addr);
+    std::cout << "Waiting for a client to connect...\n";
+
+    // You can use print statements as follows for debugging, they'll be visible
+    // when running tests.
+    std::cout << "Logs from your program will appear here!\n";
+
+    // Uncomment this block to pass the first stage
+
+    // accept(server_fd, (struct sockaddr *)&client_addr,
+    //        (socklen_t *)&client_addr_len);
+    while (true) {
+      int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
+                             (socklen_t *)&client_addr_len);
+
+      if (client_fd >= 0) {
+        std::thread(handleClient, client_fd, dir, dbfilename, port, replicaof,
+                    false)
+            .detach();
+      }
+
+      std::cout << "Client connected\n" << client_fd;
+    }
+
+    if (clientSocket >= 0)
+      close(clientSocket);
+    close(server_fd);
+
+    return 0;
   }
-
-  if (clientSocket >= 0)
-    close(clientSocket);
-  close(server_fd);
-
-  return 0;
-}
