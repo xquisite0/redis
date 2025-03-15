@@ -809,6 +809,7 @@ void handleClient(int client_fd, const std::string &dir,
               std::vector<std::pair<std::string, std::vector<std::string>>>>>
               streamsToOutput;
           do {
+            streamsToOutput.clear();
             for (auto &[stream_key, start] : stream_keys_start) {
               auto [startMillisecondsTime, startSequenceNumber] =
                   extractMillisecondsAndSequence(start, stream_key);
