@@ -51,7 +51,6 @@ std::pair<long long, int> extractMillisecondsAndSequence(std::string entry_id) {
   std::string millisecondsTimeString = "", sequenceNumberString = "";
   bool isMillisecondsPart = true;
   for (char &c : entry_id) {
-    std::cout << "Is this an infinite loop?\n";
     if (c == '-') {
       isMillisecondsPart = false;
       continue;
@@ -64,6 +63,7 @@ std::pair<long long, int> extractMillisecondsAndSequence(std::string entry_id) {
 
   long long millisecondsTime = std::stoll(millisecondsTimeString);
   int sequenceNumber = std::stoi(sequenceNumberString);
+  return std::make_pair(millisecondsTime, sequenceNumber);
 }
 
 static void readBytes(std::ifstream &is, char *buffer, int length) {
