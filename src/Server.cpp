@@ -804,35 +804,40 @@ void handleClient(int client_fd, const std::string &dir,
                 std::make_pair(message.elements[i].value,
                                message.elements[stream_count + i].value));
           }
-          std::vector<std::pair<
-              std::string,
-              std::vector<std::pair<std::string, std::vector<std::string>>>>>
-              streamsToOutput;
-          for (auto &[stream_key, start] : stream_keys_start) {
-            auto [startMillisecondsTime, startSequenceNumber] =
-                extractMillisecondsAndSequence(start, stream_key);
-            std::pair<
+
+          do {
+            std::vector<std::pair<
                 std::string,
-                std::vector<std::pair<std::string, std::vector<std::string>>>>
-                curStream;
-            curStream.first = stream_key;
+                std::vector<std::pair<std::string, std::vector<std::string>>>>>
+                streamsToOutput;
+            for (auto &[stream_key, start] : stream_keys_start) {
+              auto [startMillisecondsTime, startSequenceNumber] =
+                  extractMillisecondsAndSequence(start, stream_key);
+              std::pair<
+                  std::string,
+                  std::vector<std::pair<std::string, std::vector<std::string>>>>
+                  curStream;
+              curStream.first = stream_key;
 
-            for (auto &entry : streams[stream_key]) {
-              auto [entry_id, keyValuePairs] = entry;
-              auto [curMillisecondsTime, curSequenceNumber] =
-                  extractMillisecondsAndSequence(entry_id, stream_key);
+              for (auto &entry : streams[stream_key]) {
+                auto [entry_id, keyValuePairs] = entry;
+                auto [curMillisecondsTime, curSequenceNumber] =
+                    extractMillisecondsAndSequence(entry_id, stream_key);
 
-              bool afterStart = startMillisecondsTime < curMillisecondsTime ||
-                                (startMillisecondsTime == curMillisecondsTime &&
-                                 startSequenceNumber < curSequenceNumber);
+                bool afterStart =
+                    startMillisecondsTime < curMillisecondsTime ||
+                    (startMillisecondsTime == curMillisecondsTime &&
+                     startSequenceNumber < curSequenceNumber);
 
-              if (afterStart) {
-                curStream.second.push_back(entry);
-                entriesPresent = true;
+                if (afterStart) {
+                  curStream.second.push_back(entry);
+                  entriesPresent = true;
+                }
               }
+              streamsToOutput.push_back(curStream);
             }
-            streamsToOutput.push_back(curStream);
-          }
+          } while (blockMilliseconds == 0 && !entriesPresent);
+
           if (blockMilliseconds != -1 && !entriesPresent) {
             response = "$-1\r\n";
           } else {
