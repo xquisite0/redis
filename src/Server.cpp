@@ -336,6 +336,7 @@ void handleClient(int client_fd, const std::string &dir,
     if (recv(client_fd, &buffer, 1, MSG_PEEK) <= 0) {
       break;
     }
+    std::string response;
 
     ProtocolParser parser(client_fd);
     parser.reset();
@@ -349,23 +350,31 @@ void handleClient(int client_fd, const std::string &dir,
       }
       if (command != "exec") {
         transactionCommands.push_back(message);
-        std::string queuedResponse = "+QUEUED\r\n";
+        std::string response = "+QUEUED\r\n";
 
-        send(client_fd, queuedResponse.c_str(), queuedResponse.size(), 0);
+        send(client_fd, response.c_str(), response.size(), 0);
         continue;
       } else {
+        if (!transactionBegun) {
+          response = "-ERR EXEC without MULTI\r\n";
+          send(client_fd, response.c_str(), response.size(), 0);
+        } else {
+          if (transactionCommands.empty()) {
+            response = "*0\r\n";
+            send(client_fd, response.c_str(), response.size(), 0);
+          }
+        }
         transactionExecuting = true;
       }
     }
 
     int transactionNumber = 0;
-    std::string response;
 
     do {
+      response = "";
       if (transactionExecuting) {
         message = transactionCommands[transactionNumber];
         transactionNumber++;
-        response = "";
       }
       // Checking for ECHO command
       std::cout << "THIS RAN " << message.elements.empty() << "\n";
@@ -952,16 +961,17 @@ void handleClient(int client_fd, const std::string &dir,
           } else if (command == "multi") {
             transactionBegun = true;
             response = "+OK\r\n";
-          } else if (command == "exec") {
-            if (!transactionBegun) {
-              response = "-ERR EXEC without MULTI\r\n";
-            } else {
-              if (transactionCommands.empty()) {
-                response = "*0\r\n";
-              }
-            }
-            transactionBegun = false;
           }
+          // else if (command == "exec") {
+          //   if (!transactionBegun) {
+          //     response = "-ERR EXEC without MULTI\r\n";
+          //   } else {
+          //     if (transactionCommands.empty()) {
+          //       response = "*0\r\n";
+          //     }
+          //   }
+          //   transactionBegun = false;
+          // }
         }
       }
 
@@ -999,6 +1009,7 @@ void handleClient(int client_fd, const std::string &dir,
         //             transactionResponse + "\r\n";
       }
       transactionExecuting = false;
+      transactionBegun = false;
     }
 
     std::cout << "\n\nSending: " << response << "\n\n";
