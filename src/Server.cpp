@@ -804,12 +804,11 @@ void handleClient(int client_fd, const std::string &dir,
                 std::make_pair(message.elements[i].value,
                                message.elements[stream_count + i].value));
           }
-
+          std::vector<std::pair<
+              std::string,
+              std::vector<std::pair<std::string, std::vector<std::string>>>>>
+              streamsToOutput;
           do {
-            std::vector<std::pair<
-                std::string,
-                std::vector<std::pair<std::string, std::vector<std::string>>>>>
-                streamsToOutput;
             for (auto &[stream_key, start] : stream_keys_start) {
               auto [startMillisecondsTime, startSequenceNumber] =
                   extractMillisecondsAndSequence(start, stream_key);
