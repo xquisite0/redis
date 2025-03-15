@@ -770,6 +770,8 @@ void handleClient(int client_fd, const std::string &dir,
                   "$" + std::to_string(elem.size()) + "\r\n" + elem + "\r\n";
             }
           }
+
+          std::cout << "Response: " << std::quoted(response) << "\n";
         }
       }
     }
