@@ -47,7 +47,8 @@ void setRecvTimeout(int fd, int timeout_ms) {
   }
 }
 
-std::pair<long long, int> extractMillisecondsAndSequence(std::string entry_id) {
+std::pair<long long, int>
+extractMillisecondsAndSequence(std::string entry_id, std::string stream_key) {
   std::string millisecondsTimeString = "", sequenceNumberString = "";
   bool isMillisecondsPart = true;
   for (char &c : entry_id) {
@@ -59,6 +60,23 @@ std::pair<long long, int> extractMillisecondsAndSequence(std::string entry_id) {
       millisecondsTimeString += c;
     else
       sequenceNumberString += c;
+  }
+
+  if (millisecondsTimeString != "*" && sequenceNumberString == "*") {
+    int generatedSequenceNumber = 0;
+    if (millisecondsTimeString == "0")
+      generatedSequenceNumber = 1;
+
+    if (!streams[stream_key].empty()) {
+      auto [prevMillisecondsTime, prevSequenceNumber] =
+          extractMillisecondsAndSequence(streams[stream_key].back()["id"],
+                                         stream_key);
+      if (prevMillisecondsTime == std::stoll(millisecondsTimeString)) {
+        generatedSequenceNumber = prevSequenceNumber + 1;
+      }
+    }
+
+    sequenceNumberString = std::to_string(generatedSequenceNumber);
   }
 
   long long millisecondsTime = std::stoll(millisecondsTimeString);
@@ -648,7 +666,7 @@ void handleClient(int client_fd, const std::string &dir,
             // millisecondsTime = entry_id_separated.first; int sequenceNumber =
             // entry_id_separated.second;
             auto [millisecondsTime, sequenceNumber] =
-                extractMillisecondsAndSequence(entry_id);
+                extractMillisecondsAndSequence(entry_id, stream_key);
 
             bool validEntry = true;
 
@@ -659,7 +677,7 @@ void handleClient(int client_fd, const std::string &dir,
             } else if (!streams[stream_key].empty()) {
               auto [prevMillisecondsTime, prevSequenceNumber] =
                   extractMillisecondsAndSequence(
-                      streams[stream_key].back()["id"]);
+                      streams[stream_key].back()["id"], stream_key);
               if (prevMillisecondsTime > millisecondsTime ||
                   (prevMillisecondsTime == millisecondsTime &&
                    prevSequenceNumber >= sequenceNumber)) {
@@ -680,6 +698,8 @@ void handleClient(int client_fd, const std::string &dir,
               }
               streams[stream_key].push_back(entry);
 
+              entry_id = std::to_string(millisecondsTime) + "-" +
+                         std::to_string(sequenceNumber);
               response = "$" + std::to_string(entry_id.size()) + "\r\n" +
                          entry_id + "\r\n";
             }
