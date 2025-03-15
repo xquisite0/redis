@@ -910,7 +910,7 @@ void handleClient(int client_fd, const std::string &dir,
 
             response = ":" + curValueString + "\r\n";
           }
-        } else if (command == "MULTI") {
+        } else if (command == "multi") {
           response = "+OK\r\n";
         }
       }
