@@ -780,8 +780,9 @@ void handleClient(int client_fd, const std::string &dir,
           std::vector<std::pair<std::string, std::string>> stream_keys_start;
           int stream_count = (message.elements.size() - 2) / 2;
           for (int i = 2; i < 2 + stream_count; i++) {
-            stream_keys_start.push_back(std::make_pair(
-                message.elements[i].value, message.elements[stream_count + i]));
+            stream_keys_start.push_back(
+                std::make_pair(message.elements[i].value,
+                               message.elements[stream_count + i].value));
           }
           std::vector<std::pair<
               std::string,
