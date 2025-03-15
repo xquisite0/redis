@@ -969,6 +969,8 @@ void handleClient(int client_fd, const std::string &dir,
         replica_offset += message.rawMessage.size();
       }
       if (transactionExecuting) {
+        std::cout << "This is a transaction response number "
+                  << transactionNumber << ". Response: " << response << "\n";
         transactionResponses.push_back(response);
       }
 
