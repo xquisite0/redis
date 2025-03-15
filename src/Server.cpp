@@ -26,6 +26,9 @@ std::vector<int> replicaSockets;
 
 // key should map should some sort of data structure for entries
 std::unordered_set<std::string> streamKeys;
+std::unordered_map<std::string,
+                   std::vector<std::unordered_map<std::string, std::string>>>
+    streams;
 std::unordered_map<std::string, std::string> keyValue;
 bool propagated = false;
 int master_fd = -1;
@@ -42,6 +45,24 @@ void setRecvTimeout(int fd, int timeout_ms) {
       0) {
     std::cerr << "Error setting socket timeout" << std::endl;
   }
+}
+
+std::pair<long long, int> extractMillisecondsAndSequence(std::string entry_id) {
+  std::string millisecondsTimeString = "", sequenceNumberString = "";
+  bool isMillisecondsPart = true;
+  for (char &c : entry_id) {
+    if (c == '-') {
+      isMillisecondsPart = false;
+      continue;
+    }
+    if (isMillisecondsPart)
+      millisecondsTimeString += c;
+    else
+      sequenceNumberString += c;
+  }
+
+  long long millisecondsTime = std::stoll(millisecondsTimeString);
+  int sequenceNumber = std::stoi(sequenceNumberString);
 }
 
 static void readBytes(std::ifstream &is, char *buffer, int length) {
@@ -620,8 +641,49 @@ void handleClient(int client_fd, const std::string &dir,
           }
           if (message.elements.size() >= 3) {
             std::string entry_id = message.elements[2].value;
-            response = "$" + std::to_string(entry_id.size()) + "\r\n" +
-                       entry_id + "\r\n";
+
+            // std::pair<long long, int> entry_id_separated =
+            // extractMillisecondsAndSequence(entry_id); long long
+            // millisecondsTime = entry_id_separated.first; int sequenceNumber =
+            // entry_id_separated.second;
+            auto [millisecondsTime, sequenceNumber] =
+                extractMillisecondsAndSequence(entry_id);
+
+            bool validEntry = true;
+
+            if (streams[stream_key].empty()) {
+              if (millisecondsTime <= 0 && sequenceNumber <= 0) {
+                response = "-ERR The ID specified in XADD must be greater than "
+                           "0-0\r\n";
+                validEntry = false;
+              }
+            } else {
+              auto [prevMillisecondsTime, prevSequenceNumber] =
+                  extractMillisecondsAndSequence(
+                      streams[stream_key].back()["id"]);
+              if (prevMillisecondsTime > millisecondsTime ||
+                  (prevMillisecondsTime == millisecondsTime &&
+                   prevSequenceNumber >= sequenceNumber)) {
+                response = "-ERR The ID specified in XADD is equal or smaller "
+                           "than the target stream top item\r\n";
+                validEntry = false;
+              }
+            }
+
+            // if it is valid, we can add the entry to the stream
+            if (validEntry) {
+
+              std::unordered_map<std::string, std::string> entry;
+              entry["id"] = entry_id;
+              for (int i = 4; i + 1 < message.elements.size(); i += 2) {
+                entry[message.elements[i].value] =
+                    message.elements[i + 1].value;
+              }
+              streams[stream_key].push_back(entry);
+
+              response = "$" + std::to_string(entry_id.size()) + "\r\n" +
+                         entry_id + "\r\n";
+            }
           }
         }
       }
