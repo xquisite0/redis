@@ -880,6 +880,21 @@ void handleClient(int client_fd, const std::string &dir,
               }
             }
           }
+        } else if (command == "incr") {
+          std::string key = message.elements[1].value;
+
+          // extract value
+          std::string curValueString = keyValue[key];
+          int curValue = std::stoi(curValueString);
+
+          // increment value
+          curValue++;
+
+          // replace value
+          curValueString = std::to_string(curValue);
+          keyValue[key] = curValueString;
+
+          response = ":" + curValueString + "\r\n";
         }
       }
     }
