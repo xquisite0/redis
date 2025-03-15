@@ -835,6 +835,9 @@ void handleClient(int client_fd, const std::string &dir,
               }
               streamsToOutput.push_back(curStream);
             }
+            if (blockMilliseconds != 0 || entriesPresent)
+              break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
           } while (blockMilliseconds == 0 && !entriesPresent);
 
           if (blockMilliseconds != -1 && !entriesPresent) {
