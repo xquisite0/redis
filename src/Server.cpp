@@ -975,6 +975,8 @@ void handleClient(int client_fd, const std::string &dir,
             if (!transactionBegun) {
               response = "-ERR EXEC without MULTI\r\n";
             }
+          } else if (command == "discard") {
+            response = "-ERR DISCARD without MULTI\r\n";
           }
           // else if (command == "exec") {
           //   if (!transactionBegun) {
