@@ -348,9 +348,15 @@ void handleClient(int client_fd, const std::string &dir,
       for (char &c : message.elements[0].value) {
         command += tolower(c);
       }
-      if (command != "exec") {
+      if (command == "discard") {
+        transactionCommands.clear();
+        transactionBegun = false;
+        response = "+OK\r\n";
+        send(client_fd, response.c_str(), response.size(), 0);
+        continue;
+      } else if (command != "exec") {
         transactionCommands.push_back(message);
-        std::string response = "+QUEUED\r\n";
+        response = "+QUEUED\r\n";
 
         send(client_fd, response.c_str(), response.size(), 0);
         continue;
@@ -962,6 +968,8 @@ void handleClient(int client_fd, const std::string &dir,
             }
           } else if (command == "multi") {
             transactionBegun = true;
+            transactionCommands.clear();
+            transactionResponses.clear();
             response = "+OK\r\n";
           } else if (command == "exec") {
             if (!transactionBegun) {
