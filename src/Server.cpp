@@ -935,6 +935,7 @@ void handleClient(int client_fd, const std::string &dir,
               response = "*0\r\n";
             }
           }
+          transactionInProgress = false;
         }
       }
     }
