@@ -641,6 +641,7 @@ void handleClient(int client_fd, const std::string &dir,
           }
           if (message.elements.size() >= 3) {
             std::string entry_id = message.elements[2].value;
+            std::cout << "Entry ID: " << entry_id << "\n";
 
             // std::pair<long long, int> entry_id_separated =
             // extractMillisecondsAndSequence(entry_id); long long
