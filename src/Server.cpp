@@ -962,6 +962,10 @@ void handleClient(int client_fd, const std::string &dir,
           } else if (command == "multi") {
             transactionBegun = true;
             response = "+OK\r\n";
+          } else if (command == "exec") {
+            if (!transactionBegun) {
+              response = "-ERR EXEC without MULTI\r\n";
+            }
           }
           // else if (command == "exec") {
           //   if (!transactionBegun) {
