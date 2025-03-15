@@ -72,7 +72,7 @@ extractMillisecondsAndSequence(std::string entry_id, std::string stream_key) {
                            .count());
   }
 
-  if (sequenceNumberString == "*") {
+  if (sequenceNumberString == "*" || entry_id == "*") {
     int generatedSequenceNumber = 0;
     if (millisecondsTimeString == "0")
       generatedSequenceNumber = 1;
