@@ -811,6 +811,16 @@ void handleClient(int client_fd, const std::string &dir,
           do {
             streamsToOutput.clear();
             for (auto &[stream_key, start] : stream_keys_start) {
+
+              if (start == "$") {
+                auto now = std::chrono::system_clock::now();
+                auto unix_timestamp =
+                    std::chrono::duration_cast<std::chrono::seconds>(
+                        now.time_since_epoch())
+                        .count();
+                start = std::to_string(unix_timestamp) + "-0";
+              }
+
               auto [startMillisecondsTime, startSequenceNumber] =
                   extractMillisecondsAndSequence(start, stream_key);
               std::pair<
