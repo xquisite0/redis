@@ -912,6 +912,8 @@ void handleClient(int client_fd, const std::string &dir,
           }
         } else if (command == "multi") {
           response = "+OK\r\n";
+        } else if (command == "exec") {
+          response = "-ERR EXEC without MULTI\r\n";
         }
       }
     }
