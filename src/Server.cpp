@@ -727,6 +727,9 @@ void handleClient(int client_fd, const std::string &dir,
           if (start == "-") {
             start = "0-1";
           }
+          if (end == "+") {
+            end = std::to_string((long long)1e18) + "-" + std::to_string(1e9);
+          }
           if (start.find('-') == std::string::npos)
             start += "-0";
           if (end.find('-') == std::string::npos)
