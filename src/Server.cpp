@@ -709,7 +709,7 @@ void handleClient(int client_fd, const std::string &dir,
 
               std::pair<std::string, std::vector<std::string>> entry;
               entry.first = entry_id;
-              for (int i = 4; i < message.elements.size(); i++) {
+              for (int i = 3; i < message.elements.size(); i++) {
                 entry.second.push_back(message.elements[i].value);
               }
               streams[stream_key].push_back(entry);
@@ -770,8 +770,6 @@ void handleClient(int client_fd, const std::string &dir,
                   "$" + std::to_string(elem.size()) + "\r\n" + elem + "\r\n";
             }
           }
-
-          std::cout << "Response: " << std::quoted(response) << "\n";
         }
       }
     }
