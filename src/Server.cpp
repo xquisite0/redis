@@ -341,12 +341,16 @@ void handleClient(int client_fd, const std::string &dir,
     std::cout << "Message: \n" << message.rawMessage << "\n";
 
     if (transactionInProgress) {
+      std::cout << "A Transaction is in progress\n";
       std::string command = "";
       for (char &c : message.elements[0].value) {
         command += tolower(c);
       }
       if (command != "exec") {
         transactionCommands.push_back(message.rawMessage);
+        std::string queuedResponse = "+QUEUED\r\n";
+
+        send(client_fd, queuedResponse.c_str(), queuedResponse.size(), 0);
         continue;
       }
     }
