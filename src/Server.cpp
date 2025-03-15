@@ -781,6 +781,7 @@ void handleClient(int client_fd, const std::string &dir,
 
           int streamsIndexStart = -1;
           long long blockMilliseconds = -1;
+          bool entriesPresent = false;
           for (int i = 1; i < message.elements.size(); i++) {
             if (message.elements[i].value == "streams") {
               streamsIndexStart = i + 1;
@@ -827,27 +828,31 @@ void handleClient(int client_fd, const std::string &dir,
 
               if (afterStart) {
                 curStream.second.push_back(entry);
+                entriesPresent = true;
               }
             }
             streamsToOutput.push_back(curStream);
           }
-
-          response = "*" + std::to_string(streamsToOutput.size()) + "\r\n";
-          for (auto &[stream_key, entries] : streamsToOutput) {
-            response += "*2\r\n";
-            response += "$" + std::to_string(stream_key.size()) + "\r\n" +
-                        stream_key + "\r\n";
-
-            response += "*" + std::to_string(entries.size()) + "\r\n";
-            for (auto &[entry_id, keyValuePairs] : entries) {
+          if (blockMilliseconds != -1 && !entriesPresent) {
+            response = "$-1\r\n";
+          } else {
+            response = "*" + std::to_string(streamsToOutput.size()) + "\r\n";
+            for (auto &[stream_key, entries] : streamsToOutput) {
               response += "*2\r\n";
-              response += "$" + std::to_string(entry_id.size()) + "\r\n" +
-                          entry_id + "\r\n";
-              response += "*" + std::to_string(keyValuePairs.size()) + "\r\n";
+              response += "$" + std::to_string(stream_key.size()) + "\r\n" +
+                          stream_key + "\r\n";
 
-              for (auto &elem : keyValuePairs) {
-                response +=
-                    "$" + std::to_string(elem.size()) + "\r\n" + elem + "\r\n";
+              response += "*" + std::to_string(entries.size()) + "\r\n";
+              for (auto &[entry_id, keyValuePairs] : entries) {
+                response += "*2\r\n";
+                response += "$" + std::to_string(entry_id.size()) + "\r\n" +
+                            entry_id + "\r\n";
+                response += "*" + std::to_string(keyValuePairs.size()) + "\r\n";
+
+                for (auto &elem : keyValuePairs) {
+                  response += "$" + std::to_string(elem.size()) + "\r\n" +
+                              elem + "\r\n";
+                }
               }
             }
           }
