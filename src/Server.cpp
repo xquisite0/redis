@@ -652,6 +652,7 @@ void handleClient(int client_fd, const std::string &dir,
             bool validEntry = true;
 
             if (streams[stream_key].empty()) {
+              std::cout << "The stream is empty\n";
               if (millisecondsTime <= 0 && sequenceNumber <= 0) {
                 response = "-ERR The ID specified in XADD must be greater than "
                            "0-0\r\n";
@@ -669,7 +670,6 @@ void handleClient(int client_fd, const std::string &dir,
                 validEntry = false;
               }
             }
-            std::cout << "Valid Entry: " << validEntry << "\n";
 
             // if it is valid, we can add the entry to the stream
             if (validEntry) {
