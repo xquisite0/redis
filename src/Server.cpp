@@ -298,8 +298,10 @@ void handleClient(int client_fd, const std::string &dir,
   // }
   std::unordered_map<std::string, unsigned long long> keyStartExpiry;
 
-  bool transactionInProgress = false;
-  std::vector<std::string> transactionCommands;
+  bool transactionBegun = false;
+  bool transactionExecuting = false;
+  std::vector<RedisMessage> transactionCommands;
+  std::vector<std::string> transactionResponses;
 
   // restore state of Redis with persistence.
   parseRDB(keyValue, keyStartExpiry, dir, dbfilename);
@@ -340,56 +342,95 @@ void handleClient(int client_fd, const std::string &dir,
     RedisMessage message = parser.parse();
     std::cout << "Message: \n" << message.rawMessage << "\n";
 
-    if (transactionInProgress) {
-      std::cout << "A Transaction is in progress\n";
+    if (transactionBegun) {
       std::string command = "";
       for (char &c : message.elements[0].value) {
         command += tolower(c);
       }
       if (command != "exec") {
-        transactionCommands.push_back(message.rawMessage);
+        transactionCommands.push_back(message);
         std::string queuedResponse = "+QUEUED\r\n";
 
         send(client_fd, queuedResponse.c_str(), queuedResponse.size(), 0);
         continue;
+      } else {
+        transactionExecuting = true;
       }
     }
 
+    int transactionNumber = 0;
     std::string response;
 
-    // Checking for ECHO command
-    std::cout << "THIS RAN " << message.elements.empty() << "\n";
-    if (!message.elements.empty()) {
-      RedisMessage firstElement = message.elements[0];
-      if (firstElement.type == BULK_STRING) {
+    do {
+      if (transactionExecuting) {
+        message = transactionCommands[transactionNumber];
+        transactionNumber++;
+        response = "";
+      }
+      // Checking for ECHO command
+      std::cout << "THIS RAN " << message.elements.empty() << "\n";
+      if (!message.elements.empty()) {
+        RedisMessage firstElement = message.elements[0];
+        if (firstElement.type == BULK_STRING) {
 
-        std::string command = "";
-        for (char c : firstElement.value) {
-          command += tolower(c);
-        }
-        std::cout << "Command Name: " << command << "\n";
-        if (command == "echo") {
-          response = "+" + message.elements[1].value + "\r\n";
-
-        } else if (command == "ping") {
-          response = "+PONG\r\n";
-
-        } else if (command == "set") {
-
-          master_repl_offset += message.rawMessage.size();
-          for (int fd : replicaSockets) {
-            send(fd, message.rawMessage.c_str(), message.rawMessage.size(), 0);
+          std::string command = "";
+          for (char c : firstElement.value) {
+            command += tolower(c);
           }
-          std::cout << "\n\nSET KEY: " << message.elements[1].value
-                    << " with VALUE: " << message.elements[2].value
-                    << " with replica: " << replicaof << "\n\n";
-          keyValue[message.elements[1].value] = message.elements[2].value;
+          std::cout << "Command Name: " << command << "\n";
+          if (command == "echo") {
+            response = "+" + message.elements[1].value + "\r\n";
 
-          // std::cout << "\ntest: " << keyValue["foo"] << "\n";
-          response = "+OK\r\n";
+          } else if (command == "ping") {
+            response = "+PONG\r\n";
 
-          if (message.elements.size() > 2) {
-            if (message.elements[3].value == "px") {
+          } else if (command == "set") {
+
+            master_repl_offset += message.rawMessage.size();
+            for (int fd : replicaSockets) {
+              send(fd, message.rawMessage.c_str(), message.rawMessage.size(),
+                   0);
+            }
+            std::cout << "\n\nSET KEY: " << message.elements[1].value
+                      << " with VALUE: " << message.elements[2].value
+                      << " with replica: " << replicaof << "\n\n";
+            keyValue[message.elements[1].value] = message.elements[2].value;
+
+            // std::cout << "\ntest: " << keyValue["foo"] << "\n";
+            response = "+OK\r\n";
+
+            if (message.elements.size() > 2) {
+              if (message.elements[3].value == "px") {
+                auto now = std::chrono::system_clock::now();
+
+                // Convert to milliseconds since the Unix epoch
+                auto duration =
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        now.time_since_epoch());
+
+                // Get the Unix time in milliseconds
+                long long unix_time_ms = duration.count();
+                long long expiryTimestamp =
+                    unix_time_ms + stoll(message.elements[4].value);
+
+                keyStartExpiry[message.elements[1].value] = expiryTimestamp;
+              }
+            }
+
+          } else if (command == "get") {
+            bool valid = true;
+
+            // key has not been set
+            if (keyValue.find(message.elements[1].value) == keyValue.end()) {
+              std::cout << "\n\nKEY " << message.elements[1].value
+                        << " HAS NOT BEEN SET\n\n";
+              response = "$-1\r\n";
+              valid = false;
+            }
+            // check for expiry
+            if (keyStartExpiry.find(message.elements[1].value) !=
+                keyStartExpiry.end()) {
+              // std::cout << "\n\nThis element has an expiry date set\n\n";
               auto now = std::chrono::system_clock::now();
 
               // Convert to milliseconds since the Unix epoch
@@ -398,551 +439,541 @@ void handleClient(int client_fd, const std::string &dir,
                       now.time_since_epoch());
 
               // Get the Unix time in milliseconds
-              long long unix_time_ms = duration.count();
-              long long expiryTimestamp =
-                  unix_time_ms + stoll(message.elements[4].value);
+              unsigned long long get_time = duration.count();
+              // long long set_time =
+              // keyStartExpiry[message.elements[1].value].first;
 
-              keyStartExpiry[message.elements[1].value] = expiryTimestamp;
-            }
-          }
+              // int expiry = keyStartExpiry[message.elements[1].value].second;
 
-        } else if (command == "get") {
-          bool valid = true;
+              // std::cout << "\nget_time - set_time: " << get_time << " "
+              // << set_time << "\n";
 
-          // key has not been set
-          if (keyValue.find(message.elements[1].value) == keyValue.end()) {
-            std::cout << "\n\nKEY " << message.elements[1].value
-                      << " HAS NOT BEEN SET\n\n";
-            response = "$-1\r\n";
-            valid = false;
-          }
-          // check for expiry
-          if (keyStartExpiry.find(message.elements[1].value) !=
-              keyStartExpiry.end()) {
-            // std::cout << "\n\nThis element has an expiry date set\n\n";
-            auto now = std::chrono::system_clock::now();
+              // std::chrono::duration<double, std::milli> duration =
+              //     get_time - set_time;
 
-            // Convert to milliseconds since the Unix epoch
-            auto duration =
-                std::chrono::duration_cast<std::chrono::milliseconds>(
-                    now.time_since_epoch());
-
-            // Get the Unix time in milliseconds
-            unsigned long long get_time = duration.count();
-            // long long set_time =
-            // keyStartExpiry[message.elements[1].value].first;
-
-            // int expiry = keyStartExpiry[message.elements[1].value].second;
-
-            // std::cout << "\nget_time - set_time: " << get_time << " "
-            // << set_time << "\n";
-
-            // std::chrono::duration<double, std::milli> duration =
-            //     get_time - set_time;
-
-            // double duration = (get_time - set_time).count();
-            // int duration = difftime(get_time, set_time); // in seconds
-            // std::cout << "\nDuration: " << duration.count()
-            //           << "\nExpiry: " << expiry << "\n";
-            unsigned long long expiryTimestamp =
-                keyStartExpiry[message.elements[1].value];
-            if (get_time > expiryTimestamp) {
-              response = "$-1\r\n";
-              valid = false;
-            }
-          }
-
-          if (valid) {
-            std::string value = keyValue[message.elements[1].value];
-            response =
-                "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
-          }
-        } else if (command == "config") {
-          // CONFIG GET
-          // std::cout << "\2nd Argument from client:"
-          //           << strcasecmp(message.elements[1].value.c_str(), "get")
-          //           << "\n";
-          if (message.elements.size() >= 2 &&
-              strcasecmp(message.elements[1].value.c_str(), "get") == 0) {
-            if (message.elements[2].value == "dir") {
-              response = "*2\r\n$3\r\ndir\r\n$" + std::to_string(dir.size()) +
-                         "\r\n" + dir + "\r\n";
-            } else if (message.elements[2].value == "dbfilename") {
-              response = "*2\r\n$10\r\ndbfilename\r\n$" +
-                         std::to_string(dbfilename.size()) + "\r\n" +
-                         dbfilename + "\r\n";
-            }
-          }
-        } else if (command == "keys") {
-          // assume that "*" is passed in.
-          // std::cout << "Second Parameter val: " << message.elements[1].value
-          //           << "\n";
-          if (strcasecmp(message.elements[1].value.c_str(), "*") == 0) {
-            // pull that out
-            response = "*" + std::to_string(keyValue.size()) + "\r\n";
-
-            for (auto elem : keyValue) {
-              std::string key = elem.first;
-              response +=
-                  "$" + std::to_string(key.size()) + "\r\n" + key + "\r\n";
-            }
-          }
-        } else if (command == "info") {
-          // assume that the key is replication
-
-          if (replicaof == "") {
-            // std::string offsetstd::to_string(master_repl_offset)
-            std::string response_string =
-                "role:master\r\nmaster_replid:" + master_replid +
-                "\r\nmaster_repl_offset:" + std::to_string(master_repl_offset);
-            response = "$" + std::to_string(response_string.size()) + "\r\n" +
-                       response_string + "\r\n";
-          } else {
-            response = "$10\r\nrole:slave\r\n";
-          }
-        } else if (command == "replconf") {
-          // std::cout << "Ran\n";
-          if (replicaof == "") {
-            response = "+OK\r\n";
-            std::cout << "Master has received the REPLCONF ACK message from "
-                         "the replica\n";
-            if (message.elements.size() >= 3 &&
-                message.elements[1].value == "ACK") {
-              sendResponse = false;
-              int offset = stoi(message.elements[2].value);
-              std::cout << "The offset value from replica is "
-                        << std::to_string(offset) << "\n";
-
-              std::cout << "Master offset is " << master_repl_offset << "\n";
-
-              if (offset == master_repl_offset) {
-                std::unique_lock<std::mutex> lock(mtx); // Lock the mutex
-                ++syncedReplicas;
+              // double duration = (get_time - set_time).count();
+              // int duration = difftime(get_time, set_time); // in seconds
+              // std::cout << "\nDuration: " << duration.count()
+              //           << "\nExpiry: " << expiry << "\n";
+              unsigned long long expiryTimestamp =
+                  keyStartExpiry[message.elements[1].value];
+              if (get_time > expiryTimestamp) {
+                response = "$-1\r\n";
+                valid = false;
               }
-              std::cout << "Synced Replica count has updated to "
-                        << syncedReplicas << "\n";
             }
 
-            /*
+            if (valid) {
+              std::string value = keyValue[message.elements[1].value];
+              response =
+                  "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
+            }
+          } else if (command == "config") {
+            // CONFIG GET
+            // std::cout << "\2nd Argument from client:"
+            //           << strcasecmp(message.elements[1].value.c_str(), "get")
+            //           << "\n";
+            if (message.elements.size() >= 2 &&
+                strcasecmp(message.elements[1].value.c_str(), "get") == 0) {
+              if (message.elements[2].value == "dir") {
+                response = "*2\r\n$3\r\ndir\r\n$" + std::to_string(dir.size()) +
+                           "\r\n" + dir + "\r\n";
+              } else if (message.elements[2].value == "dbfilename") {
+                response = "*2\r\n$10\r\ndbfilename\r\n$" +
+                           std::to_string(dbfilename.size()) + "\r\n" +
+                           dbfilename + "\r\n";
+              }
+            }
+          } else if (command == "keys") {
+            // assume that "*" is passed in.
+            // std::cout << "Second Parameter val: " <<
+            // message.elements[1].value
+            //           << "\n";
+            if (strcasecmp(message.elements[1].value.c_str(), "*") == 0) {
+              // pull that out
+              response = "*" + std::to_string(keyValue.size()) + "\r\n";
 
-            include code here NA2. WAIT with multiple commands.
+              for (auto elem : keyValue) {
+                std::string key = elem.first;
+                response +=
+                    "$" + std::to_string(key.size()) + "\r\n" + key + "\r\n";
+              }
+            }
+          } else if (command == "info") {
+            // assume that the key is replication
 
-            */
-          } else {
-            std::cout << "\nSize: " << message.elements.size() << "\n\n";
-            if (message.elements.size() >= 3) {
-              std::cout << "\n1 value: " << message.elements[1].value << "\n\n";
-              if (message.elements[1].value == "GETACK") {
-                std::cout << "\n2 value: " << message.elements[2].value
+            if (replicaof == "") {
+              // std::string offsetstd::to_string(master_repl_offset)
+              std::string response_string =
+                  "role:master\r\nmaster_replid:" + master_replid +
+                  "\r\nmaster_repl_offset:" +
+                  std::to_string(master_repl_offset);
+              response = "$" + std::to_string(response_string.size()) + "\r\n" +
+                         response_string + "\r\n";
+            } else {
+              response = "$10\r\nrole:slave\r\n";
+            }
+          } else if (command == "replconf") {
+            // std::cout << "Ran\n";
+            if (replicaof == "") {
+              response = "+OK\r\n";
+              std::cout << "Master has received the REPLCONF ACK message from "
+                           "the replica\n";
+              if (message.elements.size() >= 3 &&
+                  message.elements[1].value == "ACK") {
+                sendResponse = false;
+                int offset = stoi(message.elements[2].value);
+                std::cout << "The offset value from replica is "
+                          << std::to_string(offset) << "\n";
+
+                std::cout << "Master offset is " << master_repl_offset << "\n";
+
+                if (offset == master_repl_offset) {
+                  std::unique_lock<std::mutex> lock(mtx); // Lock the mutex
+                  ++syncedReplicas;
+                }
+                std::cout << "Synced Replica count has updated to "
+                          << syncedReplicas << "\n";
+              }
+
+              /*
+
+              include code here NA2. WAIT with multiple commands.
+
+              */
+            } else {
+              std::cout << "\nSize: " << message.elements.size() << "\n\n";
+              if (message.elements.size() >= 3) {
+                std::cout << "\n1 value: " << message.elements[1].value
                           << "\n\n";
-                if (message.elements[2].value == "*") {
-                  response =
-                      "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$" +
-                      std::to_string(std::to_string(replica_offset).size()) +
-                      "\r\n" + std::to_string(replica_offset) + "\r\n";
+                if (message.elements[1].value == "GETACK") {
+                  std::cout << "\n2 value: " << message.elements[2].value
+                            << "\n\n";
+                  if (message.elements[2].value == "*") {
+                    response =
+                        "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$" +
+                        std::to_string(std::to_string(replica_offset).size()) +
+                        "\r\n" + std::to_string(replica_offset) + "\r\n";
+                  }
                 }
               }
+              send(client_fd, response.c_str(), response.size(), 0);
             }
+          } else if (command == "psync") {
+            response = "+FULLRESYNC " + master_replid + " " +
+                       std::to_string(master_repl_offset) + "\r\n";
+
             send(client_fd, response.c_str(), response.size(), 0);
-          }
-        } else if (command == "psync") {
-          response = "+FULLRESYNC " + master_replid + " " +
-                     std::to_string(master_repl_offset) + "\r\n";
 
-          send(client_fd, response.c_str(), response.size(), 0);
+            // send our RDB file for replica to sync to
 
-          // send our RDB file for replica to sync to
+            // simulate with an empty RDB file
+            std::string emptyRDB =
+                "524544495330303131fa0972656469732d76657205372e322e30fa0a726564"
+                "69"
+                "732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2"
+                "b0"
+                "c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
 
-          // simulate with an empty RDB file
-          std::string emptyRDB =
-              "524544495330303131fa0972656469732d76657205372e322e30fa0a72656469"
-              "732d62697473c040fa056374696d65c26d08bc65fa08757365642d6d656dc2b0"
-              "c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
-
-          std::string bytes = "";
-          for (size_t i = 0; i < emptyRDB.length(); i += 2) {
-            std::string byteString = emptyRDB.substr(i, 2);
-            unsigned char byte =
-                static_cast<unsigned char>(std::stoi(byteString, nullptr, 16));
-            bytes.push_back(byte);
-          }
-
-          response = "$" + std::to_string(bytes.size()) + "\r\n" + bytes;
-
-          replicaSockets.push_back(client_fd);
-        } else if (command == "wait") {
-          int numreplicas = stoi(message.elements[1].value);
-          int timeout = stoi(message.elements[2].value);
-
-          // auto now = std::chrono::system_clock::now();
-
-          // // Convert to milliseconds since the Unix epoch
-          // auto duration =
-          // std::chrono::duration_cast<std::chrono::milliseconds>(
-          //     now.time_since_epoch());
-
-          // // Get the Unix time in milliseconds
-          // unsigned long long cur_time = duration.count();
-          // unsigned long long timeoutTimestamp = cur_time + timeout;
-
-          if (master_repl_offset == 0) {
-            response = ":" + std::to_string(replicaSockets.size()) + "\r\n";
-          } else {
-            std::string offsetRequest =
-                "*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n";
-
-            // while (true) {
-            // if (true) {
-            std::unique_lock<std::mutex> lock(mtx);
-            syncedReplicas = 0;
-            lock.unlock();
-            // }
-
-            // int curReplica = 0;
-            // std::cout << "\nmaster_repl_offset " << master_repl_offset <<
-            // "\n";
-
-            for (int fd : replicaSockets) {
-              send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
+            std::string bytes = "";
+            for (size_t i = 0; i < emptyRDB.length(); i += 2) {
+              std::string byteString = emptyRDB.substr(i, 2);
+              unsigned char byte = static_cast<unsigned char>(
+                  std::stoi(byteString, nullptr, 16));
+              bytes.push_back(byte);
             }
 
-            auto startTime = std::chrono::steady_clock::now();
+            response = "$" + std::to_string(bytes.size()) + "\r\n" + bytes;
 
-            // Define timeout duration (e.g., 5000 milliseconds = 5 seconds)
-            std::chrono::milliseconds timeoutDuration(timeout);
-
-            // Calculate the timeout timestamp
-            auto timeoutTimestamp = startTime + timeoutDuration;
-
-            // Loop until the current time reaches the timeout
-            while (std::chrono::steady_clock::now() < timeoutTimestamp) {
-              std::unique_lock<std::mutex> lock(mtx);
-              if (syncedReplicas >= numreplicas)
-                break;
-              lock.unlock();
-              std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            }
-
-            // std::this_thread::sleep_for(std::chrono::milliseconds(125));
-
-            // for (int fd : replicaSockets) {
-            //   setRecvTimeout(fd, 250);
-            //   curReplica++;
-            //   std::cout << "\nChecking the offset of replica socket number "
-            //             << curReplica << "\n";
-
-            //   std::cout << "\n" << curReplica << ": Sent offset request\n";
-
-            //   // check whether the connection is closed by peeking at the top
-            //   // of the buffer
-            //   char buffer;
-            //   if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
-            //     std::cout << "\nWe are skipping replica socket number "
-            //               << curReplica << "\n";
-            //     continue;
-            //   }
-
-            //   ProtocolParser parser(fd);
-            //   RedisMessage offsetMessage = parser.parse();
-            //   std::cout << "\nFinished obtaining the message with the offset
-            //   "
-            //                "of replica socket number "
-            //             << curReplica << "\n";
-            //   int offset = stoi(offsetMessage.elements[2].value);
-            //   std::cout << "\nReplica socket number " << fd
-            //             << " gave the following offset value: "
-            //             << std::to_string(offset) << "\n";
-
-            //   if (offset == master_repl_offset)
-            //     syncedReplicas++;
-            // }
-
-            // if (syncedReplicas >= numreplicas) {
-            //   response = ":" + std::to_string(syncedReplicas) + "\r\n";
-            // }
+            replicaSockets.push_back(client_fd);
+          } else if (command == "wait") {
+            int numreplicas = stoi(message.elements[1].value);
+            int timeout = stoi(message.elements[2].value);
 
             // auto now = std::chrono::system_clock::now();
 
             // // Convert to milliseconds since the Unix epoch
             // auto duration =
-            //     std::chrono::duration_cast<std::chrono::milliseconds>(
-            //         now.time_since_epoch());
+            // std::chrono::duration_cast<std::chrono::milliseconds>(
+            //     now.time_since_epoch());
 
             // // Get the Unix time in milliseconds
             // unsigned long long cur_time = duration.count();
-            // std::this_thread::sleep_for(
-            //     std::chrono::milliseconds(timeout)); // Sleep for 500ms
-            lock.lock();
-            response = ":" + std::to_string(syncedReplicas) + "\r\n";
-            master_repl_offset += offsetRequest.size();
-          }
-        } else if (command == "type") {
-          std::string key = message.elements[1].value;
+            // unsigned long long timeoutTimestamp = cur_time + timeout;
 
-          if (streamKeys.find(key) != streamKeys.end()) {
-            response = "+stream\r\n";
-          } else if (keyValue.find(key) != keyValue.end()) {
-            response = "+string\r\n";
-          } else {
-            response = "+none\r\n";
-          }
-        } else if (command == "xadd") {
-          std::string stream_key = message.elements[1].value;
-          if (streamKeys.find(stream_key) == streamKeys.end()) {
-            streamKeys.insert(stream_key);
-          }
-          if (message.elements.size() >= 3) {
-            std::string entry_id = message.elements[2].value;
+            if (master_repl_offset == 0) {
+              response = ":" + std::to_string(replicaSockets.size()) + "\r\n";
+            } else {
+              std::string offsetRequest =
+                  "*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n";
 
-            // std::pair<long long, int> entry_id_separated =
-            // extractMillisecondsAndSequence(entry_id); long long
-            // millisecondsTime = entry_id_separated.first; int sequenceNumber =
-            // entry_id_separated.second;
-            auto [millisecondsTime, sequenceNumber] =
-                extractMillisecondsAndSequence(entry_id, stream_key);
+              // while (true) {
+              // if (true) {
+              std::unique_lock<std::mutex> lock(mtx);
+              syncedReplicas = 0;
+              lock.unlock();
+              // }
 
-            bool validEntry = true;
+              // int curReplica = 0;
+              // std::cout << "\nmaster_repl_offset " << master_repl_offset <<
+              // "\n";
 
-            if (millisecondsTime <= 0 && sequenceNumber <= 0) {
-              response = "-ERR The ID specified in XADD must be greater than "
-                         "0-0\r\n";
-              validEntry = false;
-            } else if (!streams[stream_key].empty()) {
-              auto [prevMillisecondsTime, prevSequenceNumber] =
-                  extractMillisecondsAndSequence(
-                      streams[stream_key].back().first, stream_key);
-              if (prevMillisecondsTime > millisecondsTime ||
-                  (prevMillisecondsTime == millisecondsTime &&
-                   prevSequenceNumber >= sequenceNumber)) {
-                response = "-ERR The ID specified in XADD is equal or smaller "
-                           "than the target stream top item\r\n";
+              for (int fd : replicaSockets) {
+                send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
+              }
+
+              auto startTime = std::chrono::steady_clock::now();
+
+              // Define timeout duration (e.g., 5000 milliseconds = 5 seconds)
+              std::chrono::milliseconds timeoutDuration(timeout);
+
+              // Calculate the timeout timestamp
+              auto timeoutTimestamp = startTime + timeoutDuration;
+
+              // Loop until the current time reaches the timeout
+              while (std::chrono::steady_clock::now() < timeoutTimestamp) {
+                std::unique_lock<std::mutex> lock(mtx);
+                if (syncedReplicas >= numreplicas)
+                  break;
+                lock.unlock();
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+              }
+
+              // std::this_thread::sleep_for(std::chrono::milliseconds(125));
+
+              // for (int fd : replicaSockets) {
+              //   setRecvTimeout(fd, 250);
+              //   curReplica++;
+              //   std::cout << "\nChecking the offset of replica socket number
+              //   "
+              //             << curReplica << "\n";
+
+              //   std::cout << "\n" << curReplica << ": Sent offset request\n";
+
+              //   // check whether the connection is closed by peeking at the
+              //   top
+              //   // of the buffer
+              //   char buffer;
+              //   if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
+              //     std::cout << "\nWe are skipping replica socket number "
+              //               << curReplica << "\n";
+              //     continue;
+              //   }
+
+              //   ProtocolParser parser(fd);
+              //   RedisMessage offsetMessage = parser.parse();
+              //   std::cout << "\nFinished obtaining the message with the
+              //   offset
+              //   "
+              //                "of replica socket number "
+              //             << curReplica << "\n";
+              //   int offset = stoi(offsetMessage.elements[2].value);
+              //   std::cout << "\nReplica socket number " << fd
+              //             << " gave the following offset value: "
+              //             << std::to_string(offset) << "\n";
+
+              //   if (offset == master_repl_offset)
+              //     syncedReplicas++;
+              // }
+
+              // if (syncedReplicas >= numreplicas) {
+              //   response = ":" + std::to_string(syncedReplicas) + "\r\n";
+              // }
+
+              // auto now = std::chrono::system_clock::now();
+
+              // // Convert to milliseconds since the Unix epoch
+              // auto duration =
+              //     std::chrono::duration_cast<std::chrono::milliseconds>(
+              //         now.time_since_epoch());
+
+              // // Get the Unix time in milliseconds
+              // unsigned long long cur_time = duration.count();
+              // std::this_thread::sleep_for(
+              //     std::chrono::milliseconds(timeout)); // Sleep for 500ms
+              lock.lock();
+              response = ":" + std::to_string(syncedReplicas) + "\r\n";
+              master_repl_offset += offsetRequest.size();
+            }
+          } else if (command == "type") {
+            std::string key = message.elements[1].value;
+
+            if (streamKeys.find(key) != streamKeys.end()) {
+              response = "+stream\r\n";
+            } else if (keyValue.find(key) != keyValue.end()) {
+              response = "+string\r\n";
+            } else {
+              response = "+none\r\n";
+            }
+          } else if (command == "xadd") {
+            std::string stream_key = message.elements[1].value;
+            if (streamKeys.find(stream_key) == streamKeys.end()) {
+              streamKeys.insert(stream_key);
+            }
+            if (message.elements.size() >= 3) {
+              std::string entry_id = message.elements[2].value;
+
+              // std::pair<long long, int> entry_id_separated =
+              // extractMillisecondsAndSequence(entry_id); long long
+              // millisecondsTime = entry_id_separated.first; int sequenceNumber
+              // = entry_id_separated.second;
+              auto [millisecondsTime, sequenceNumber] =
+                  extractMillisecondsAndSequence(entry_id, stream_key);
+
+              bool validEntry = true;
+
+              if (millisecondsTime <= 0 && sequenceNumber <= 0) {
+                response = "-ERR The ID specified in XADD must be greater than "
+                           "0-0\r\n";
                 validEntry = false;
-              }
-            }
-
-            // if it is valid, we can add the entry to the stream
-            if (validEntry) {
-              // refresh entry id, in case it is a generated one. e.g. we don't
-              // add id "0-*", we add id "0-1" (auto-generated)
-              entry_id = std::to_string(millisecondsTime) + "-" +
-                         std::to_string(sequenceNumber);
-
-              if (maxMillisecondsTime > millisecondsTime) {
-                maxMillisecondsTime = millisecondsTime;
-                maxSequenceNumber = sequenceNumber;
-              } else if (maxMillisecondsTime == millisecondsTime &&
-                         sequenceNumber > maxSequenceNumber) {
-                maxSequenceNumber = sequenceNumber;
-              }
-
-              std::pair<std::string, std::vector<std::string>> entry;
-              entry.first = entry_id;
-              for (int i = 3; i < message.elements.size(); i++) {
-                entry.second.push_back(message.elements[i].value);
-              }
-              streams[stream_key].push_back(entry);
-
-              response = "$" + std::to_string(entry_id.size()) + "\r\n" +
-                         entry_id + "\r\n";
-            }
-          }
-        } else if (command == "xrange") {
-          std::string stream_key = message.elements[1].value;
-
-          std::string start = message.elements[2].value,
-                      end = message.elements[3].value;
-
-          if (start == "-") {
-            start = "0-1";
-          }
-          if (end == "+") {
-            end = std::to_string((long long)1e18) + "-" + std::to_string(1e9);
-          }
-          if (start.find('-') == std::string::npos)
-            start += "-0";
-          if (end.find('-') == std::string::npos)
-            end += "-" + std::to_string(1e9);
-
-          auto [startMillisecondsTime, startSequenceNumber] =
-              extractMillisecondsAndSequence(start, stream_key);
-          auto [endMillisecondsTime, endSequenceNumber] =
-              extractMillisecondsAndSequence(end, stream_key);
-
-          std::vector<std::pair<std::string, std::vector<std::string>>>
-              entriesToOutput;
-          for (auto &entry : streams[stream_key]) {
-            auto [entry_id, keyValuePairs] = entry;
-            auto [curMillisecondsTime, curSequenceNumber] =
-                extractMillisecondsAndSequence(entry_id, stream_key);
-
-            bool afterStart = startMillisecondsTime < curMillisecondsTime ||
-                              (startMillisecondsTime == curMillisecondsTime &&
-                               startSequenceNumber <= curSequenceNumber);
-            bool beforeEnd = curMillisecondsTime < endMillisecondsTime ||
-                             (curMillisecondsTime == endMillisecondsTime &&
-                              curSequenceNumber <= endSequenceNumber);
-
-            if (afterStart && beforeEnd) {
-              entriesToOutput.push_back(entry);
-            }
-          }
-
-          // we now have to format the entriesToOutput into RESP format
-
-          response = "*" + std::to_string(entriesToOutput.size()) + "\r\n";
-          for (auto &entry : entriesToOutput) {
-            response += "*2\r\n";
-
-            auto [entry_id, keyValuePairs] = entry;
-
-            response += "$" + std::to_string(entry_id.size()) + "\r\n" +
-                        entry_id + "\r\n";
-            response += "*" + std::to_string(keyValuePairs.size()) + "\r\n";
-
-            for (std::string &elem : keyValuePairs) {
-              response +=
-                  "$" + std::to_string(elem.size()) + "\r\n" + elem + "\r\n";
-            }
-          }
-        } else if (command == "xread") {
-          std::vector<std::pair<std::string, std::string>> stream_keys_start;
-
-          int streamsIndexStart = -1;
-          long long blockMilliseconds = -1;
-          bool entriesPresent = false;
-          for (int i = 1; i < message.elements.size(); i++) {
-            if (message.elements[i].value == "streams") {
-              streamsIndexStart = i + 1;
-            }
-            if (message.elements[i].value == "block") {
-              blockMilliseconds = std::stoll(message.elements[i + 1].value);
-            }
-          }
-
-          if (blockMilliseconds != -1) {
-            std::this_thread::sleep_for(
-                std::chrono::milliseconds(blockMilliseconds));
-          }
-
-          int stream_count =
-              ((int)message.elements.size() - streamsIndexStart) / 2;
-          for (int i = streamsIndexStart; i < streamsIndexStart + stream_count;
-               i++) {
-            stream_keys_start.push_back(
-                std::make_pair(message.elements[i].value,
-                               message.elements[stream_count + i].value));
-          }
-          std::vector<std::pair<
-              std::string,
-              std::vector<std::pair<std::string, std::vector<std::string>>>>>
-              streamsToOutput;
-          do {
-            streamsToOutput.clear();
-            for (auto &[stream_key, start] : stream_keys_start) {
-
-              if (start == "$") {
-                start = std::to_string(maxMillisecondsTime) + "-" +
-                        std::to_string(maxSequenceNumber);
-              }
-
-              auto [startMillisecondsTime, startSequenceNumber] =
-                  extractMillisecondsAndSequence(start, stream_key);
-              std::pair<
-                  std::string,
-                  std::vector<std::pair<std::string, std::vector<std::string>>>>
-                  curStream;
-              curStream.first = stream_key;
-
-              for (auto &entry : streams[stream_key]) {
-                auto [entry_id, keyValuePairs] = entry;
-                auto [curMillisecondsTime, curSequenceNumber] =
-                    extractMillisecondsAndSequence(entry_id, stream_key);
-
-                bool afterStart =
-                    startMillisecondsTime < curMillisecondsTime ||
-                    (startMillisecondsTime == curMillisecondsTime &&
-                     startSequenceNumber < curSequenceNumber);
-
-                if (afterStart) {
-                  curStream.second.push_back(entry);
-                  entriesPresent = true;
+              } else if (!streams[stream_key].empty()) {
+                auto [prevMillisecondsTime, prevSequenceNumber] =
+                    extractMillisecondsAndSequence(
+                        streams[stream_key].back().first, stream_key);
+                if (prevMillisecondsTime > millisecondsTime ||
+                    (prevMillisecondsTime == millisecondsTime &&
+                     prevSequenceNumber >= sequenceNumber)) {
+                  response =
+                      "-ERR The ID specified in XADD is equal or smaller "
+                      "than the target stream top item\r\n";
+                  validEntry = false;
                 }
               }
-              streamsToOutput.push_back(curStream);
-            }
-            if (blockMilliseconds != 0 || entriesPresent)
-              break;
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-          } while (blockMilliseconds == 0 && !entriesPresent);
 
-          if (blockMilliseconds != -1 && !entriesPresent) {
-            response = "$-1\r\n";
-          } else {
-            response = "*" + std::to_string(streamsToOutput.size()) + "\r\n";
-            for (auto &[stream_key, entries] : streamsToOutput) {
+              // if it is valid, we can add the entry to the stream
+              if (validEntry) {
+                // refresh entry id, in case it is a generated one. e.g. we
+                // don't add id "0-*", we add id "0-1" (auto-generated)
+                entry_id = std::to_string(millisecondsTime) + "-" +
+                           std::to_string(sequenceNumber);
+
+                if (maxMillisecondsTime > millisecondsTime) {
+                  maxMillisecondsTime = millisecondsTime;
+                  maxSequenceNumber = sequenceNumber;
+                } else if (maxMillisecondsTime == millisecondsTime &&
+                           sequenceNumber > maxSequenceNumber) {
+                  maxSequenceNumber = sequenceNumber;
+                }
+
+                std::pair<std::string, std::vector<std::string>> entry;
+                entry.first = entry_id;
+                for (int i = 3; i < message.elements.size(); i++) {
+                  entry.second.push_back(message.elements[i].value);
+                }
+                streams[stream_key].push_back(entry);
+
+                response = "$" + std::to_string(entry_id.size()) + "\r\n" +
+                           entry_id + "\r\n";
+              }
+            }
+          } else if (command == "xrange") {
+            std::string stream_key = message.elements[1].value;
+
+            std::string start = message.elements[2].value,
+                        end = message.elements[3].value;
+
+            if (start == "-") {
+              start = "0-1";
+            }
+            if (end == "+") {
+              end = std::to_string((long long)1e18) + "-" + std::to_string(1e9);
+            }
+            if (start.find('-') == std::string::npos)
+              start += "-0";
+            if (end.find('-') == std::string::npos)
+              end += "-" + std::to_string(1e9);
+
+            auto [startMillisecondsTime, startSequenceNumber] =
+                extractMillisecondsAndSequence(start, stream_key);
+            auto [endMillisecondsTime, endSequenceNumber] =
+                extractMillisecondsAndSequence(end, stream_key);
+
+            std::vector<std::pair<std::string, std::vector<std::string>>>
+                entriesToOutput;
+            for (auto &entry : streams[stream_key]) {
+              auto [entry_id, keyValuePairs] = entry;
+              auto [curMillisecondsTime, curSequenceNumber] =
+                  extractMillisecondsAndSequence(entry_id, stream_key);
+
+              bool afterStart = startMillisecondsTime < curMillisecondsTime ||
+                                (startMillisecondsTime == curMillisecondsTime &&
+                                 startSequenceNumber <= curSequenceNumber);
+              bool beforeEnd = curMillisecondsTime < endMillisecondsTime ||
+                               (curMillisecondsTime == endMillisecondsTime &&
+                                curSequenceNumber <= endSequenceNumber);
+
+              if (afterStart && beforeEnd) {
+                entriesToOutput.push_back(entry);
+              }
+            }
+
+            // we now have to format the entriesToOutput into RESP format
+
+            response = "*" + std::to_string(entriesToOutput.size()) + "\r\n";
+            for (auto &entry : entriesToOutput) {
               response += "*2\r\n";
-              response += "$" + std::to_string(stream_key.size()) + "\r\n" +
-                          stream_key + "\r\n";
 
-              response += "*" + std::to_string(entries.size()) + "\r\n";
-              for (auto &[entry_id, keyValuePairs] : entries) {
+              auto [entry_id, keyValuePairs] = entry;
+
+              response += "$" + std::to_string(entry_id.size()) + "\r\n" +
+                          entry_id + "\r\n";
+              response += "*" + std::to_string(keyValuePairs.size()) + "\r\n";
+
+              for (std::string &elem : keyValuePairs) {
+                response +=
+                    "$" + std::to_string(elem.size()) + "\r\n" + elem + "\r\n";
+              }
+            }
+          } else if (command == "xread") {
+            std::vector<std::pair<std::string, std::string>> stream_keys_start;
+
+            int streamsIndexStart = -1;
+            long long blockMilliseconds = -1;
+            bool entriesPresent = false;
+            for (int i = 1; i < message.elements.size(); i++) {
+              if (message.elements[i].value == "streams") {
+                streamsIndexStart = i + 1;
+              }
+              if (message.elements[i].value == "block") {
+                blockMilliseconds = std::stoll(message.elements[i + 1].value);
+              }
+            }
+
+            if (blockMilliseconds != -1) {
+              std::this_thread::sleep_for(
+                  std::chrono::milliseconds(blockMilliseconds));
+            }
+
+            int stream_count =
+                ((int)message.elements.size() - streamsIndexStart) / 2;
+            for (int i = streamsIndexStart;
+                 i < streamsIndexStart + stream_count; i++) {
+              stream_keys_start.push_back(
+                  std::make_pair(message.elements[i].value,
+                                 message.elements[stream_count + i].value));
+            }
+            std::vector<std::pair<
+                std::string,
+                std::vector<std::pair<std::string, std::vector<std::string>>>>>
+                streamsToOutput;
+            do {
+              streamsToOutput.clear();
+              for (auto &[stream_key, start] : stream_keys_start) {
+
+                if (start == "$") {
+                  start = std::to_string(maxMillisecondsTime) + "-" +
+                          std::to_string(maxSequenceNumber);
+                }
+
+                auto [startMillisecondsTime, startSequenceNumber] =
+                    extractMillisecondsAndSequence(start, stream_key);
+                std::pair<std::string,
+                          std::vector<
+                              std::pair<std::string, std::vector<std::string>>>>
+                    curStream;
+                curStream.first = stream_key;
+
+                for (auto &entry : streams[stream_key]) {
+                  auto [entry_id, keyValuePairs] = entry;
+                  auto [curMillisecondsTime, curSequenceNumber] =
+                      extractMillisecondsAndSequence(entry_id, stream_key);
+
+                  bool afterStart =
+                      startMillisecondsTime < curMillisecondsTime ||
+                      (startMillisecondsTime == curMillisecondsTime &&
+                       startSequenceNumber < curSequenceNumber);
+
+                  if (afterStart) {
+                    curStream.second.push_back(entry);
+                    entriesPresent = true;
+                  }
+                }
+                streamsToOutput.push_back(curStream);
+              }
+              if (blockMilliseconds != 0 || entriesPresent)
+                break;
+              std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            } while (blockMilliseconds == 0 && !entriesPresent);
+
+            if (blockMilliseconds != -1 && !entriesPresent) {
+              response = "$-1\r\n";
+            } else {
+              response = "*" + std::to_string(streamsToOutput.size()) + "\r\n";
+              for (auto &[stream_key, entries] : streamsToOutput) {
                 response += "*2\r\n";
-                response += "$" + std::to_string(entry_id.size()) + "\r\n" +
-                            entry_id + "\r\n";
-                response += "*" + std::to_string(keyValuePairs.size()) + "\r\n";
+                response += "$" + std::to_string(stream_key.size()) + "\r\n" +
+                            stream_key + "\r\n";
 
-                for (auto &elem : keyValuePairs) {
-                  response += "$" + std::to_string(elem.size()) + "\r\n" +
-                              elem + "\r\n";
+                response += "*" + std::to_string(entries.size()) + "\r\n";
+                for (auto &[entry_id, keyValuePairs] : entries) {
+                  response += "*2\r\n";
+                  response += "$" + std::to_string(entry_id.size()) + "\r\n" +
+                              entry_id + "\r\n";
+                  response +=
+                      "*" + std::to_string(keyValuePairs.size()) + "\r\n";
+
+                  for (auto &elem : keyValuePairs) {
+                    response += "$" + std::to_string(elem.size()) + "\r\n" +
+                                elem + "\r\n";
+                  }
                 }
               }
             }
-          }
-        } else if (command == "incr") {
-          std::string key = message.elements[1].value;
+          } else if (command == "incr") {
+            std::string key = message.elements[1].value;
 
-          // initialise key if it does not exist
-          if (keyValue.find(key) == keyValue.end()) {
-            keyValue[key] = "0";
-          }
-
-          // extract value
-          std::string curValueString = keyValue[key];
-          int curValue = -1;
-          bool validValue = true;
-
-          try {
-            curValue = std::stoi(curValueString);
-          } catch (...) {
-            validValue = false;
-          }
-          if (!validValue) {
-            response = "-ERR value is not an integer or out of range\r\n";
-          } else {
-            // increment value
-            curValue++;
-
-            // replace value
-            curValueString = std::to_string(curValue);
-            keyValue[key] = curValueString;
-
-            response = ":" + curValueString + "\r\n";
-          }
-        } else if (command == "multi") {
-          transactionInProgress = true;
-          response = "+OK\r\n";
-        } else if (command == "exec") {
-          if (!transactionInProgress) {
-            response = "-ERR EXEC without MULTI\r\n";
-          } else {
-            if (transactionCommands.empty()) {
-              response = "*0\r\n";
+            // initialise key if it does not exist
+            if (keyValue.find(key) == keyValue.end()) {
+              keyValue[key] = "0";
             }
+
+            // extract value
+            std::string curValueString = keyValue[key];
+            int curValue = -1;
+            bool validValue = true;
+
+            try {
+              curValue = std::stoi(curValueString);
+            } catch (...) {
+              validValue = false;
+            }
+            if (!validValue) {
+              response = "-ERR value is not an integer or out of range\r\n";
+            } else {
+              // increment value
+              curValue++;
+
+              // replace value
+              curValueString = std::to_string(curValue);
+              keyValue[key] = curValueString;
+
+              response = ":" + curValueString + "\r\n";
+            }
+          } else if (command == "multi") {
+            transactionBegun = true;
+            response = "+OK\r\n";
+          } else if (command == "exec") {
+            if (!transactionBegun) {
+              response = "-ERR EXEC without MULTI\r\n";
+            } else {
+              if (transactionCommands.empty()) {
+                response = "*0\r\n";
+              }
+            }
+            transactionBegun = false;
           }
-          transactionInProgress = false;
         }
       }
-    }
+
+      if (client_fd == master_fd) {
+        replica_offset += message.rawMessage.size();
+      }
+      if (transactionExecuting) {
+        transactionResponses.push_back(response);
+      }
+
+    } while (transactionExecuting &&
+             transactionNumber < transactionCommands.size());
 
     // std::string response = "+PONG\r\n";
     // std::cout << "\nResponse to send: " << response << "\n";
@@ -953,11 +984,22 @@ void handleClient(int client_fd, const std::string &dir,
 
     // if we are a replica, with our current socket connected to the master
     // for propagated commands
-    if (client_fd == master_fd) {
-      replica_offset += message.rawMessage.size();
-    } else if (sendResponse) {
+    // if (client_fd == master_fd) {
+    //   replica_offset += message.rawMessage.size();
+    // } else if (sendResponse) {
+    //   send(client_fd, response.c_str(), response.size(), 0);
+    // }
+    if (transactionExecuting) {
+      response = "*" + std::to_string(transactionResponses.size()) + "\r\n";
+      for (std::string &response : transactionResponses) {
+        response +=
+            "$" + std::to_string(response.size()) + "\r\n" + response + "\r\n";
+      }
+    }
+    if (client_fd != master_fd && sendResponse) {
       send(client_fd, response.c_str(), response.size(), 0);
     }
+
     // }
 
     // if (isPropagation && replicaof != "") {
