@@ -778,8 +778,27 @@ void handleClient(int client_fd, const std::string &dir,
           }
         } else if (command == "xread") {
           std::vector<std::pair<std::string, std::string>> stream_keys_start;
-          int stream_count = (message.elements.size() - 2) / 2;
-          for (int i = 2; i < 2 + stream_count; i++) {
+
+          int streamsIndexStart = -1;
+          long long blockMilliseconds = -1;
+          for (int i = 1; i < message.elements.size(); i++) {
+            if (message.elements[i].value == "streams") {
+              streamsIndexStart = i + 1;
+            }
+            if (message.elements[i].value == "block") {
+              blockMilliseconds = std::stoll(message.elements[i + 1].value);
+            }
+          }
+
+          if (blockMilliseconds != -1) {
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(blockMilliseconds));
+          }
+
+          int stream_count =
+              ((int)message.elements.size() - streamsIndexStart) / 2;
+          for (int i = streamsIndexStart; i < streamsIndexStart + stream_count;
+               i++) {
             stream_keys_start.push_back(
                 std::make_pair(message.elements[i].value,
                                message.elements[stream_count + i].value));
