@@ -51,6 +51,7 @@ std::pair<long long, int> extractMillisecondsAndSequence(std::string entry_id) {
   std::string millisecondsTimeString = "", sequenceNumberString = "";
   bool isMillisecondsPart = true;
   for (char &c : entry_id) {
+    std::cout << "Is this an infinite loop?\n";
     if (c == '-') {
       isMillisecondsPart = false;
       continue;
