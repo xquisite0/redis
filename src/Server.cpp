@@ -652,14 +652,11 @@ void handleClient(int client_fd, const std::string &dir,
 
             bool validEntry = true;
 
-            if (streams[stream_key].empty()) {
-              std::cout << "The stream is empty\n";
-              if (millisecondsTime <= 0 && sequenceNumber <= 0) {
-                response = "-ERR The ID specified in XADD must be greater than "
-                           "0-0\r\n";
-                validEntry = false;
-              }
-            } else {
+            if (millisecondsTime <= 0 && sequenceNumber <= 0) {
+              response = "-ERR The ID specified in XADD must be greater than "
+                         "0-0\r\n";
+              validEntry = false;
+            } else if (!streams[stream_key].empty()) {
               auto [prevMillisecondsTime, prevSequenceNumber] =
                   extractMillisecondsAndSequence(
                       streams[stream_key].back()["id"]);
