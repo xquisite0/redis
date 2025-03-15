@@ -90,6 +90,7 @@ extractMillisecondsAndSequence(std::string entry_id, std::string stream_key) {
   }
 
   long long millisecondsTime = std::stoll(millisecondsTimeString);
+  std::cout << "Sequence Number String: " << sequenceNumberString << "\n";
   int sequenceNumber = std::stoi(sequenceNumberString);
   return std::make_pair(millisecondsTime, sequenceNumber);
 }
