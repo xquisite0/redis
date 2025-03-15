@@ -363,6 +363,7 @@ void handleClient(int client_fd, const std::string &dir,
           response = "*0\r\n";
           transactionBegun = false;
           send(client_fd, response.c_str(), response.size(), 0);
+          continue;
         }
 
         transactionExecuting = true;
