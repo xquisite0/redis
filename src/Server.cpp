@@ -689,6 +689,10 @@ void handleClient(int client_fd, const std::string &dir,
 
             // if it is valid, we can add the entry to the stream
             if (validEntry) {
+              // refresh entry id, in case it is a generated one. e.g. we don't
+              // add id "0-*", we add id "0-1" (auto-generated)
+              entry_id = std::to_string(millisecondsTime) + "-" +
+                         std::to_string(sequenceNumber);
 
               std::unordered_map<std::string, std::string> entry;
               entry["id"] = entry_id;
@@ -698,8 +702,6 @@ void handleClient(int client_fd, const std::string &dir,
               }
               streams[stream_key].push_back(entry);
 
-              entry_id = std::to_string(millisecondsTime) + "-" +
-                         std::to_string(sequenceNumber);
               response = "$" + std::to_string(entry_id.size()) + "\r\n" +
                          entry_id + "\r\n";
             }
