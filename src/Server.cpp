@@ -824,7 +824,7 @@ void handleClient(int client_fd, const std::string &dir,
 
               if (start == "$") {
                 start = std::to_string(maxMillisecondsTime) + "-" +
-                        std::to_string(maxSequenceNumber + 1);
+                        std::to_string(maxSequenceNumber);
               }
 
               auto [startMillisecondsTime, startSequenceNumber] =
