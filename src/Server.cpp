@@ -980,7 +980,6 @@ void handleClient(int client_fd, const std::string &dir,
 
     // if (!isPropagation) {s
     // std::cout << "Synced Replicas: " << syncedReplicas << "\n";
-    std::cout << "\n\nSending: " << response << "\n\n";
 
     // if we are a replica, with our current socket connected to the master
     // for propagated commands
@@ -995,7 +994,10 @@ void handleClient(int client_fd, const std::string &dir,
         response +=
             "$" + std::to_string(response.size()) + "\r\n" + response + "\r\n";
       }
+      transactionExecuting = false;
     }
+
+    std::cout << "\n\nSending: " << response << "\n\n";
     if (client_fd != master_fd && sendResponse) {
       send(client_fd, response.c_str(), response.size(), 0);
     }
