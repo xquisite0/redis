@@ -26,8 +26,11 @@ std::vector<int> replicaSockets;
 
 // key should map should some sort of data structure for entries
 std::unordered_set<std::string> streamKeys;
-std::unordered_map<std::string,
-                   std::vector<std::unordered_map<std::string, std::string>>>
+
+// stream_key -> entries
+// each entry is a id, and a list of its key-value pairs represented in a vector
+std::unordered_map<
+    std::string, std::vector<std::pair<std::string, std::vector<std::string>>>>
     streams;
 std::unordered_map<std::string, std::string> keyValue;
 bool propagated = false;
@@ -79,7 +82,7 @@ extractMillisecondsAndSequence(std::string entry_id, std::string stream_key) {
 
     if (!streams[stream_key].empty()) {
       auto [prevMillisecondsTime, prevSequenceNumber] =
-          extractMillisecondsAndSequence(streams[stream_key].back()["id"],
+          extractMillisecondsAndSequence(streams[stream_key].back().first,
                                          stream_key);
       if (prevMillisecondsTime == std::stoll(millisecondsTimeString)) {
         generatedSequenceNumber = prevSequenceNumber + 1;
@@ -90,7 +93,6 @@ extractMillisecondsAndSequence(std::string entry_id, std::string stream_key) {
   }
 
   long long millisecondsTime = std::stoll(millisecondsTimeString);
-  std::cout << "Sequence Number String: " << sequenceNumberString << "\n";
   int sequenceNumber = std::stoi(sequenceNumberString);
   return std::make_pair(millisecondsTime, sequenceNumber);
 }
@@ -688,7 +690,7 @@ void handleClient(int client_fd, const std::string &dir,
             } else if (!streams[stream_key].empty()) {
               auto [prevMillisecondsTime, prevSequenceNumber] =
                   extractMillisecondsAndSequence(
-                      streams[stream_key].back()["id"], stream_key);
+                      streams[stream_key].back().first, stream_key);
               if (prevMillisecondsTime > millisecondsTime ||
                   (prevMillisecondsTime == millisecondsTime &&
                    prevSequenceNumber >= sequenceNumber)) {
@@ -705,16 +707,67 @@ void handleClient(int client_fd, const std::string &dir,
               entry_id = std::to_string(millisecondsTime) + "-" +
                          std::to_string(sequenceNumber);
 
-              std::unordered_map<std::string, std::string> entry;
-              entry["id"] = entry_id;
-              for (int i = 4; i + 1 < message.elements.size(); i += 2) {
-                entry[message.elements[i].value] =
-                    message.elements[i + 1].value;
+              std::pair<std::string, std::vector<std::string>> entry;
+              entry.first = entry_id;
+              for (int i = 4; i < message.elements.size(); i++) {
+                entry.second.push_back(message.elements[i].value);
               }
               streams[stream_key].push_back(entry);
 
               response = "$" + std::to_string(entry_id.size()) + "\r\n" +
                          entry_id + "\r\n";
+            }
+          }
+        } else if (command == "xrange") {
+          std::string stream_key = message.elements[1].value;
+
+          std::string start = message.elements[2].value,
+                      end = message.elements[3].value;
+
+          if (start.find('-') == std::string::npos)
+            start += "-0";
+          if (end.find('-') == std::string::npos)
+            end += "-" + std::to_string(1e9);
+
+          auto [startMillisecondsTime, startSequenceNumber] =
+              extractMillisecondsAndSequence(start, stream_key);
+          auto [endMillisecondsTime, endSequenceNumber] =
+              extractMillisecondsAndSequence(end, stream_key);
+
+          std::vector<std::pair<std::string, std::vector<std::string>>>
+              entriesToOutput;
+          for (auto &entry : streams[stream_key]) {
+            auto [entry_id, keyValuePairs] = entry;
+            auto [curMillisecondsTime, curSequenceNumber] =
+                extractMillisecondsAndSequence(entry_id, stream_key);
+
+            bool afterStart = startMillisecondsTime < curMillisecondsTime ||
+                              (startMillisecondsTime == curMillisecondsTime &&
+                               startSequenceNumber <= curSequenceNumber);
+            bool beforeEnd = curMillisecondsTime < endMillisecondsTime ||
+                             (curMillisecondsTime == endMillisecondsTime &&
+                              curSequenceNumber <= endSequenceNumber);
+
+            if (afterStart && beforeEnd) {
+              entriesToOutput.push_back(entry);
+            }
+          }
+
+          // we now have to format the entriesToOutput into RESP format
+
+          response = "*" + std::to_string(entriesToOutput.size()) + "\r\n";
+          for (auto &entry : entriesToOutput) {
+            response += "*2\r\n";
+
+            auto [entry_id, keyValuePairs] = entry;
+
+            response += "$" + std::to_string(entry_id.size()) + "\r\n" +
+                        entry_id + "\r\n";
+            response += "*" + std::to_string(keyValuePairs.size()) + "\r\n";
+
+            for (std::string &elem : keyValuePairs) {
+              response +=
+                  "$" + std::to_string(elem.size()) + "\r\n" + elem + "\r\n";
             }
           }
         }
