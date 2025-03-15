@@ -62,7 +62,17 @@ extractMillisecondsAndSequence(std::string entry_id, std::string stream_key) {
       sequenceNumberString += c;
   }
 
-  if (millisecondsTimeString != "*" && sequenceNumberString == "*") {
+  if (millisecondsTimeString == "*") {
+    auto now = std::chrono::system_clock::now();
+
+    // Convert to duration since epoch
+    millisecondsTimeString =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch())
+            .count();
+  }
+
+  if (sequenceNumberString == "*") {
     int generatedSequenceNumber = 0;
     if (millisecondsTimeString == "0")
       generatedSequenceNumber = 1;
