@@ -1,4 +1,5 @@
 #include "ProtocolParser.h"
+#include "util.cpp"
 #include <arpa/inet.h>
 #include <chrono>
 #include <cstdlib>
@@ -40,17 +41,6 @@ std::mutex mtx;
 int syncedReplicas = 0;
 long long maxMillisecondsTime = 0;
 int maxSequenceNumber = 1;
-
-void setRecvTimeout(int fd, int timeout_ms) {
-  struct timeval tv;
-  tv.tv_sec = timeout_ms / 1000;           // Convert milliseconds to seconds
-  tv.tv_usec = (timeout_ms % 1000) * 1000; // Convert remainder to microseconds
-
-  if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof(tv)) <
-      0) {
-    std::cerr << "Error setting socket timeout" << std::endl;
-  }
-}
 
 std::pair<long long, int>
 extractMillisecondsAndSequence(std::string entry_id, std::string stream_key) {
@@ -115,12 +105,9 @@ static uint8_t readByte(std::ifstream &is) {
 
 int readLength(std::ifstream &is, bool &isValue) {
   uint8_t firstByte = readByte(is);
-  // std::cout << "\n First Byte: " << std::to_string(firstByte) << "\n";
 
   uint8_t flag = (firstByte & 0xC0) >> 6;
   uint8_t value = firstByte & 0x3F;
-  // std::cout << "\n Flag & Value: " << std::to_string(flag) << " "
-  //           << std::to_string(value) << "\n";
 
   if (flag == 0) {
     return value;
@@ -171,39 +158,29 @@ void parseRDB(
 
   // skip header section
   char header[9];
-  std::cout << "\n\nReading Header...\n\n";
   is.read(header, 9);
-  std::cout << "\n\nRead header!\n\n";
-  // std::cout << header << "\n";
-  // std::unordered_map<std::string, std::string> keyValue;
 
   bool expirySet = false;
   unsigned long long expiryTimestamp = -1;
   // process segments
   while (true) {
-    std::cout << "\n\nReading opcode: \n\n";
     uint8_t opcode = readByte(is);
-    std::cout << "\n\nRead opcode!\n\n";
-    std::cout << "\nOpcode: " << std::to_string(opcode) << "\n";
+
     // metadata section
     if (opcode == 0xFA) {
       bool isValue = false;
       int length = readLength(is, isValue);
-      // std::cout << "\n Metadata Name Length: " << length << "\n";
       char name[length];
       is.read(name, length);
-      // std::cout << "\nMetadata Name: " << name << "\n";
 
       isValue = false;
       length = readLength(is, isValue);
-      // std::cout << "\n Metadata Value Length: " << length << "\n";
       std::string value;
       if (isValue) {
         value = length;
       } else {
         is.read(&value[0], length);
       }
-      // std::cout << "\nMetadata Value: " << value << "\n";
     } else if (opcode == 0xFE) {
       bool isValue = false;
       int databaseIndex = readLength(is, isValue);
@@ -214,7 +191,6 @@ void parseRDB(
       isValue = false;
       int expiryHashSize = readLength(is, isValue);
     } else if (opcode == 0x00) {
-      // std::cout << "\nThis ran!\n";
 
       bool isValue = false;
       int length = readLength(is, isValue);
@@ -233,19 +209,12 @@ void parseRDB(
         expirySet = false;
       }
     } else if (opcode == 0xFC) {
-      // std::cout << "\n\n";
       unsigned long long time = 0;
       for (int i = 0; i < 8; i++) {
         unsigned long long byte = readByte(is);
         time |= (byte << (8 * i));
         // time |= byte;
       }
-      // std::cout << "\n\n";
-
-      // auto set_time = std::chrono::high_resolution_clock::now();
-
-      // keyStartExpiry[message.elements[1].value] =
-      // std::make_pair(set_time, stol(message.elements[4].value));
       expiryTimestamp = time;
       expirySet = true;
     } else if (opcode == 0xFD) {
@@ -274,11 +243,6 @@ std::string receiveResponse(int socketFd) {
   ssize_t bytesReceived;
   bytesReceived = recv(socketFd, buffer, sizeof(buffer) - 1, 0);
   response += buffer;
-  // while ((bytesReceived = recv(socketFd, buffer, sizeof(buffer) - 1, 0)) > 0)
-  // {
-  //   buffer[bytesReceived] = '\0'; // Null-terminate received data
-  //   response += buffer;           // Append to response string
-  // }
 
   if (bytesReceived == 0) {
     std::cout << "Server closed the connection.\n";
@@ -292,10 +256,6 @@ std::string receiveResponse(int socketFd) {
 void handleClient(int client_fd, const std::string &dir,
                   const std::string &dbfilename, int port,
                   std::string replicaof, bool isPropagation) {
-
-  // while (!isPropagation && !propagated && replicaof != "") {
-  //   std::this_thread::sleep_for(std::chrono::seconds(1));
-  // }
   std::unordered_map<std::string, unsigned long long> keyStartExpiry;
 
   bool transactionBegun = false;
@@ -306,9 +266,6 @@ void handleClient(int client_fd, const std::string &dir,
   // restore state of Redis with persistence.
   parseRDB(keyValue, keyStartExpiry, dir, dbfilename);
 
-  // for (const auto &[key, value] : keyStartExpiry) {
-  //   std::cout << key << ": " << value << std::endl;
-  // }
   auto now = std::chrono::system_clock::now();
 
   // Convert to milliseconds since the Unix epoch
@@ -317,16 +274,8 @@ void handleClient(int client_fd, const std::string &dir,
 
   // Get the Unix time in milliseconds
   long long unix_time_ms = duration.count();
-  // std::cout << "\n\n Time Now: " << unix_time_ms << std::endl;
 
-  // char buffer[1024];
   while (true) {
-    // int bytesRead = read(client_fd, buffer, sizeof(buffer));
-    // if (bytesRead <= 0)
-    //   break;
-    // std::cout << "\n\nBuffer: " << buffer << "\n\n";
-    // std::cout << "\n\nBytesRead: " << bytesRead << "\n\n";
-    // std::cout << "Client: " << buffer << std::endl;
 
     // check whether the connection is closed by peeking at the top of the
     // buffer
@@ -341,7 +290,6 @@ void handleClient(int client_fd, const std::string &dir,
     ProtocolParser parser(client_fd);
     parser.reset();
     RedisMessage message = parser.parse();
-    std::cout << "Message: \n" << message.rawMessage << "\n";
 
     if (transactionBegun) {
       std::string command = "";
@@ -385,7 +333,6 @@ void handleClient(int client_fd, const std::string &dir,
         transactionNumber++;
       }
       // Checking for ECHO command
-      std::cout << "THIS RAN " << message.elements.empty() << "\n";
       if (!message.elements.empty()) {
         RedisMessage firstElement = message.elements[0];
         if (firstElement.type == BULK_STRING) {
@@ -394,7 +341,6 @@ void handleClient(int client_fd, const std::string &dir,
           for (char c : firstElement.value) {
             command += tolower(c);
           }
-          std::cout << "Command Name: " << command << "\n";
           if (command == "echo") {
             response = "+" + message.elements[1].value + "\r\n";
 
@@ -408,12 +354,8 @@ void handleClient(int client_fd, const std::string &dir,
               send(fd, message.rawMessage.c_str(), message.rawMessage.size(),
                    0);
             }
-            std::cout << "\n\nSET KEY: " << message.elements[1].value
-                      << " with VALUE: " << message.elements[2].value
-                      << " with replica: " << replicaof << "\n\n";
             keyValue[message.elements[1].value] = message.elements[2].value;
 
-            // std::cout << "\ntest: " << keyValue["foo"] << "\n";
             response = "+OK\r\n";
 
             if (message.elements.size() > 2) {
@@ -439,15 +381,12 @@ void handleClient(int client_fd, const std::string &dir,
 
             // key has not been set
             if (keyValue.find(message.elements[1].value) == keyValue.end()) {
-              std::cout << "\n\nKEY " << message.elements[1].value
-                        << " HAS NOT BEEN SET\n\n";
               response = "$-1\r\n";
               valid = false;
             }
             // check for expiry
             if (keyStartExpiry.find(message.elements[1].value) !=
                 keyStartExpiry.end()) {
-              // std::cout << "\n\nThis element has an expiry date set\n\n";
               auto now = std::chrono::system_clock::now();
 
               // Convert to milliseconds since the Unix epoch
@@ -457,21 +396,6 @@ void handleClient(int client_fd, const std::string &dir,
 
               // Get the Unix time in milliseconds
               unsigned long long get_time = duration.count();
-              // long long set_time =
-              // keyStartExpiry[message.elements[1].value].first;
-
-              // int expiry = keyStartExpiry[message.elements[1].value].second;
-
-              // std::cout << "\nget_time - set_time: " << get_time << " "
-              // << set_time << "\n";
-
-              // std::chrono::duration<double, std::milli> duration =
-              //     get_time - set_time;
-
-              // double duration = (get_time - set_time).count();
-              // int duration = difftime(get_time, set_time); // in seconds
-              // std::cout << "\nDuration: " << duration.count()
-              //           << "\nExpiry: " << expiry << "\n";
               unsigned long long expiryTimestamp =
                   keyStartExpiry[message.elements[1].value];
               if (get_time > expiryTimestamp) {
@@ -487,9 +411,6 @@ void handleClient(int client_fd, const std::string &dir,
             }
           } else if (command == "config") {
             // CONFIG GET
-            // std::cout << "\2nd Argument from client:"
-            //           << strcasecmp(message.elements[1].value.c_str(), "get")
-            //           << "\n";
             if (message.elements.size() >= 2 &&
                 strcasecmp(message.elements[1].value.c_str(), "get") == 0) {
               if (message.elements[2].value == "dir") {
@@ -503,9 +424,6 @@ void handleClient(int client_fd, const std::string &dir,
             }
           } else if (command == "keys") {
             // assume that "*" is passed in.
-            // std::cout << "Second Parameter val: " <<
-            // message.elements[1].value
-            //           << "\n";
             if (strcasecmp(message.elements[1].value.c_str(), "*") == 0) {
               // pull that out
               response = "*" + std::to_string(keyValue.size()) + "\r\n";
@@ -531,26 +449,17 @@ void handleClient(int client_fd, const std::string &dir,
               response = "$10\r\nrole:slave\r\n";
             }
           } else if (command == "replconf") {
-            // std::cout << "Ran\n";
             if (replicaof == "") {
               response = "+OK\r\n";
-              std::cout << "Master has received the REPLCONF ACK message from "
-                           "the replica\n";
               if (message.elements.size() >= 3 &&
                   message.elements[1].value == "ACK") {
                 sendResponse = false;
                 int offset = stoi(message.elements[2].value);
-                std::cout << "The offset value from replica is "
-                          << std::to_string(offset) << "\n";
-
-                std::cout << "Master offset is " << master_repl_offset << "\n";
 
                 if (offset == master_repl_offset) {
                   std::unique_lock<std::mutex> lock(mtx); // Lock the mutex
                   ++syncedReplicas;
                 }
-                std::cout << "Synced Replica count has updated to "
-                          << syncedReplicas << "\n";
               }
 
               /*
@@ -559,13 +468,8 @@ void handleClient(int client_fd, const std::string &dir,
 
               */
             } else {
-              std::cout << "\nSize: " << message.elements.size() << "\n\n";
               if (message.elements.size() >= 3) {
-                std::cout << "\n1 value: " << message.elements[1].value
-                          << "\n\n";
                 if (message.elements[1].value == "GETACK") {
-                  std::cout << "\n2 value: " << message.elements[2].value
-                            << "\n\n";
                   if (message.elements[2].value == "*") {
                     response =
                         "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$" +
@@ -607,17 +511,6 @@ void handleClient(int client_fd, const std::string &dir,
             int numreplicas = stoi(message.elements[1].value);
             int timeout = stoi(message.elements[2].value);
 
-            // auto now = std::chrono::system_clock::now();
-
-            // // Convert to milliseconds since the Unix epoch
-            // auto duration =
-            // std::chrono::duration_cast<std::chrono::milliseconds>(
-            //     now.time_since_epoch());
-
-            // // Get the Unix time in milliseconds
-            // unsigned long long cur_time = duration.count();
-            // unsigned long long timeoutTimestamp = cur_time + timeout;
-
             if (master_repl_offset == 0) {
               response = ":" + std::to_string(replicaSockets.size()) + "\r\n";
             } else {
@@ -630,10 +523,6 @@ void handleClient(int client_fd, const std::string &dir,
               syncedReplicas = 0;
               lock.unlock();
               // }
-
-              // int curReplica = 0;
-              // std::cout << "\nmaster_repl_offset " << master_repl_offset <<
-              // "\n";
 
               for (int fd : replicaSockets) {
                 send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
@@ -656,58 +545,6 @@ void handleClient(int client_fd, const std::string &dir,
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
               }
 
-              // std::this_thread::sleep_for(std::chrono::milliseconds(125));
-
-              // for (int fd : replicaSockets) {
-              //   setRecvTimeout(fd, 250);
-              //   curReplica++;
-              //   std::cout << "\nChecking the offset of replica socket number
-              //   "
-              //             << curReplica << "\n";
-
-              //   std::cout << "\n" << curReplica << ": Sent offset request\n";
-
-              //   // check whether the connection is closed by peeking at the
-              //   top
-              //   // of the buffer
-              //   char buffer;
-              //   if (recv(fd, &buffer, 1, MSG_PEEK) <= 0) {
-              //     std::cout << "\nWe are skipping replica socket number "
-              //               << curReplica << "\n";
-              //     continue;
-              //   }
-
-              //   ProtocolParser parser(fd);
-              //   RedisMessage offsetMessage = parser.parse();
-              //   std::cout << "\nFinished obtaining the message with the
-              //   offset
-              //   "
-              //                "of replica socket number "
-              //             << curReplica << "\n";
-              //   int offset = stoi(offsetMessage.elements[2].value);
-              //   std::cout << "\nReplica socket number " << fd
-              //             << " gave the following offset value: "
-              //             << std::to_string(offset) << "\n";
-
-              //   if (offset == master_repl_offset)
-              //     syncedReplicas++;
-              // }
-
-              // if (syncedReplicas >= numreplicas) {
-              //   response = ":" + std::to_string(syncedReplicas) + "\r\n";
-              // }
-
-              // auto now = std::chrono::system_clock::now();
-
-              // // Convert to milliseconds since the Unix epoch
-              // auto duration =
-              //     std::chrono::duration_cast<std::chrono::milliseconds>(
-              //         now.time_since_epoch());
-
-              // // Get the Unix time in milliseconds
-              // unsigned long long cur_time = duration.count();
-              // std::this_thread::sleep_for(
-              //     std::chrono::milliseconds(timeout)); // Sleep for 500ms
               lock.lock();
               response = ":" + std::to_string(syncedReplicas) + "\r\n";
               master_repl_offset += offsetRequest.size();
@@ -978,16 +815,6 @@ void handleClient(int client_fd, const std::string &dir,
           } else if (command == "discard") {
             response = "-ERR DISCARD without MULTI\r\n";
           }
-          // else if (command == "exec") {
-          //   if (!transactionBegun) {
-          //     response = "-ERR EXEC without MULTI\r\n";
-          //   } else {
-          //     if (transactionCommands.empty()) {
-          //       response = "*0\r\n";
-          //     }
-          //   }
-          //   transactionBegun = false;
-          // }
         }
       }
 
@@ -995,40 +822,21 @@ void handleClient(int client_fd, const std::string &dir,
         replica_offset += message.rawMessage.size();
       }
       if (transactionExecuting) {
-        std::cout << "This is a transaction response number "
-                  << transactionNumber << ". Response: " << response << "\n";
         transactionResponses.push_back(response);
       }
 
     } while (transactionExecuting &&
              transactionNumber < transactionCommands.size());
 
-    // std::string response = "+PONG\r\n";
-    // std::cout << "\nResponse to send: " << response << "\n";
-
-    // if (!isPropagation) {s
-    // std::cout << "Synced Replicas: " << syncedReplicas << "\n";
-
-    // if we are a replica, with our current socket connected to the master
-    // for propagated commands
-    // if (client_fd == master_fd) {
-    //   replica_offset += message.rawMessage.size();
-    // } else if (sendResponse) {
-    //   send(client_fd, response.c_str(), response.size(), 0);
-    // }
     if (transactionExecuting) {
       response = "*" + std::to_string(transactionResponses.size()) + "\r\n";
       for (std::string &transactionResponse : transactionResponses) {
         response += transactionResponse;
-        // response += "$" + std::to_string(transactionResponse.size()) + "\r\n"
-        // +
-        //             transactionResponse + "\r\n";
       }
       transactionExecuting = false;
       transactionBegun = false;
     }
 
-    std::cout << "\n\nSending: " << response << "\n\n";
     if (client_fd != master_fd && sendResponse) {
       send(client_fd, response.c_str(), response.size(), 0);
     }
@@ -1051,17 +859,13 @@ void executeHandshake(const std::string &dir, const std::string &dbfilename,
   in_addr_t MASTER_HOST = inet_addr(master_host_string.c_str());
   std::string master_port_string = replicaof.substr(replicaof.find(' ') + 1);
   int MASTER_PORT = stoi(master_port_string);
-  std::cout << "\nMASTER_HOST & PORT " << master_host_string << " "
-            << MASTER_PORT << "\n";
 
   int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
   master_fd = clientSocket;
-  std::cout << "Client Socket value: " << clientSocket << "\n";
 
   struct sockaddr_in master_addr;
   master_addr.sin_family = AF_INET;
   master_addr.sin_addr.s_addr = MASTER_HOST;
-  std::cout << "\nPort of Master " << MASTER_PORT << "\n";
   master_addr.sin_port = htons(MASTER_PORT);
 
   if (connect(clientSocket, (struct sockaddr *)&master_addr,
@@ -1070,16 +874,13 @@ void executeHandshake(const std::string &dir, const std::string &dbfilename,
     close(clientSocket);
     return;
   }
-  // std::cout << "\n\nReplica connected to Master\n\n";
 
   std::string message = "*1\r\n$4\r\nPING\r\n";
 
   // Send PING message
   send(clientSocket, message.c_str(), message.size(), 0);
-  // std::cout << "\n\nMessage sent to Master\n\n";
 
   std::string response = receiveResponse(clientSocket);
-  // std::cout << "\n\nResponse received: " << response << "\n\n";
 
   message = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$" +
             std::to_string(std::to_string(port).size()) + "\r\n" +
@@ -1087,48 +888,29 @@ void executeHandshake(const std::string &dir, const std::string &dbfilename,
 
   send(clientSocket, message.c_str(), message.size(), 0);
   response = receiveResponse(clientSocket);
-  // std::cout << "\n\n OK1: " << response << "\n\n";
 
   message = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
 
   send(clientSocket, message.c_str(), message.size(), 0);
 
   response = receiveResponse(clientSocket);
-  // std::cout << "\n\n OK2: " << response << "\n\n";
 
   message = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
 
   send(clientSocket, message.c_str(), message.size(), 0);
 
   // extract RDB File
-  // char buffer[1024]
-  // int bytesRead = read(clientSocket, buffer, sizeof(buffer));
   ProtocolParser parser(clientSocket);
 
   // should be the fullresync message
   RedisMessage parsedResponse = parser.parse();
-  // std::cout << "First Message: \n " << parsedResponse.rawMessage << "\n\n";
 
   // should be the RDB file
   parser.reset();
   parser.isRDB = true;
   parsedResponse = parser.parse();
   parser.isRDB = false;
-  // std::cout << "Second message: \n" << parsedResponse.rawMessage << "\n";
 
-  // response = receiveResponse(clientSocket);
-  // std::cout
-  //     << "\n\n 1Hi there! Here's the RDB response (checking if replconf "
-  //        "cmmnd is here): "
-  //     << response << std::endl;
-  // response = receiveResponse(clientSocket);
-  // std::cout << "\n\n Hi there! Here's the RDB response (checking if
-  // replconf "
-  //              "cmmnd is here): "
-  //           << response << std::endl;
-
-  // handleClient(clientSocket, dir, dbfilename, port, replicaof);
-  // close(clientSocket);
   std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof,
               true)
       .detach();
@@ -1219,8 +1001,6 @@ int main(int argc, char **argv) {
                   false)
           .detach();
     }
-
-    std::cout << "Client connected\n" << client_fd;
   }
 
   if (clientSocket >= 0)
