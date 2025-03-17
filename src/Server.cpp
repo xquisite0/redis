@@ -42,53 +42,6 @@ int syncedReplicas = 0;
 long long maxMillisecondsTime = 0;
 int maxSequenceNumber = 1;
 
-std::pair<long long, int>
-extractMillisecondsAndSequence(std::string entry_id, std::string stream_key) {
-  std::string millisecondsTimeString = "", sequenceNumberString = "";
-  bool isMillisecondsPart = true;
-  for (char &c : entry_id) {
-    if (c == '-') {
-      isMillisecondsPart = false;
-      continue;
-    }
-    if (isMillisecondsPart)
-      millisecondsTimeString += c;
-    else
-      sequenceNumberString += c;
-  }
-
-  if (millisecondsTimeString == "*") {
-    auto now = std::chrono::system_clock::now();
-
-    // Convert to duration since epoch
-    millisecondsTimeString =
-        std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(
-                           now.time_since_epoch())
-                           .count());
-  }
-
-  if (sequenceNumberString == "*" || entry_id == "*") {
-    int generatedSequenceNumber = 0;
-    if (millisecondsTimeString == "0")
-      generatedSequenceNumber = 1;
-
-    if (!streams[stream_key].empty()) {
-      auto [prevMillisecondsTime, prevSequenceNumber] =
-          extractMillisecondsAndSequence(streams[stream_key].back().first,
-                                         stream_key);
-      if (prevMillisecondsTime == std::stoll(millisecondsTimeString)) {
-        generatedSequenceNumber = prevSequenceNumber + 1;
-      }
-    }
-
-    sequenceNumberString = std::to_string(generatedSequenceNumber);
-  }
-
-  long long millisecondsTime = std::stoll(millisecondsTimeString);
-  int sequenceNumber = std::stoi(sequenceNumberString);
-  return std::make_pair(millisecondsTime, sequenceNumber);
-}
-
 static void readBytes(std::ifstream &is, char *buffer, int length) {
   if (!is.read(buffer, length)) {
     throw std::runtime_error("Unexpected EOF when reading RDB file");
@@ -567,12 +520,8 @@ void handleClient(int client_fd, const std::string &dir,
             if (message.elements.size() >= 3) {
               std::string entry_id = message.elements[2].value;
 
-              // std::pair<long long, int> entry_id_separated =
-              // extractMillisecondsAndSequence(entry_id); long long
-              // millisecondsTime = entry_id_separated.first; int sequenceNumber
-              // = entry_id_separated.second;
               auto [millisecondsTime, sequenceNumber] =
-                  extractMillisecondsAndSequence(entry_id, stream_key);
+                  extractMillisecondsAndSequence(entry_id, stream_key, streams);
 
               bool validEntry = true;
 
@@ -583,7 +532,7 @@ void handleClient(int client_fd, const std::string &dir,
               } else if (!streams[stream_key].empty()) {
                 auto [prevMillisecondsTime, prevSequenceNumber] =
                     extractMillisecondsAndSequence(
-                        streams[stream_key].back().first, stream_key);
+                        streams[stream_key].back().first, stream_key, streams);
                 if (prevMillisecondsTime > millisecondsTime ||
                     (prevMillisecondsTime == millisecondsTime &&
                      prevSequenceNumber >= sequenceNumber)) {
@@ -638,16 +587,16 @@ void handleClient(int client_fd, const std::string &dir,
               end += "-" + std::to_string(1e9);
 
             auto [startMillisecondsTime, startSequenceNumber] =
-                extractMillisecondsAndSequence(start, stream_key);
+                extractMillisecondsAndSequence(start, stream_key, streams);
             auto [endMillisecondsTime, endSequenceNumber] =
-                extractMillisecondsAndSequence(end, stream_key);
+                extractMillisecondsAndSequence(end, stream_key, streams);
 
             std::vector<std::pair<std::string, std::vector<std::string>>>
                 entriesToOutput;
             for (auto &entry : streams[stream_key]) {
               auto [entry_id, keyValuePairs] = entry;
               auto [curMillisecondsTime, curSequenceNumber] =
-                  extractMillisecondsAndSequence(entry_id, stream_key);
+                  extractMillisecondsAndSequence(entry_id, stream_key, streams);
 
               bool afterStart = startMillisecondsTime < curMillisecondsTime ||
                                 (startMillisecondsTime == curMillisecondsTime &&
@@ -720,7 +669,7 @@ void handleClient(int client_fd, const std::string &dir,
                 }
 
                 auto [startMillisecondsTime, startSequenceNumber] =
-                    extractMillisecondsAndSequence(start, stream_key);
+                    extractMillisecondsAndSequence(start, stream_key, streams);
                 std::pair<std::string,
                           std::vector<
                               std::pair<std::string, std::vector<std::string>>>>
@@ -730,7 +679,8 @@ void handleClient(int client_fd, const std::string &dir,
                 for (auto &entry : streams[stream_key]) {
                   auto [entry_id, keyValuePairs] = entry;
                   auto [curMillisecondsTime, curSequenceNumber] =
-                      extractMillisecondsAndSequence(entry_id, stream_key);
+                      extractMillisecondsAndSequence(entry_id, stream_key,
+                                                     streams);
 
                   bool afterStart =
                       startMillisecondsTime < curMillisecondsTime ||
