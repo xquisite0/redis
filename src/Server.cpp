@@ -595,7 +595,7 @@ void handleClient(int client_fd, const std::string &dir,
             // we now have to format the entriesToOutput into RESP format
             response = "*" + std::to_string(entriesToOutput.size()) + "\r\n";
             for (auto &entry : entriesToOutput) {
-              response += "*2\r\n";
+              // response += "*2\r\n";
 
               auto [entry_id, keyValuePairs] = entry;
 
