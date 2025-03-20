@@ -723,9 +723,10 @@ void handleClient(int client_fd, const std::string &dir,
 
                 response += "*" + std::to_string(entries.size()) + "\r\n";
                 for (auto &[entry_id, keyValuePairs] : entries) {
-                  response += "*2\r\n";
-                  response += "$" + std::to_string(entry_id.size()) + "\r\n" +
-                              entry_id + "\r\n";
+                  // response += "*2\r\n";
+                  // response += "$" + std::to_string(entry_id.size()) + "\r\n"
+                  // +
+                  //             entry_id + "\r\n";
 
                   std::string keyValuePairsString =
                       ProtocolGenerator::createArray(keyValuePairs);
