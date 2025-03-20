@@ -15,8 +15,9 @@ std::string createArray(std::vector<std::string> strs, bool isPureStrings) {
   for (std::string &str : strs) {
     if (!isPureStrings && str[0] == '*') {
       response += str;
+    } else {
+      response += createBulkString(str);
     }
-    response += createBulkString(str);
   }
   return response;
 }
