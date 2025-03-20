@@ -713,6 +713,8 @@ void handleClient(int client_fd, const std::string &dir,
             if (blockMilliseconds != -1 && !entriesPresent) {
               response = ProtocolGenerator::createNullBulkString();
             } else {
+
+              // format the output in RESP.
               response = "*" + std::to_string(streamsToOutput.size()) + "\r\n";
               for (auto &[stream_key, entries] : streamsToOutput) {
                 response += "*2\r\n";
@@ -724,13 +726,20 @@ void handleClient(int client_fd, const std::string &dir,
                   response += "*2\r\n";
                   response += "$" + std::to_string(entry_id.size()) + "\r\n" +
                               entry_id + "\r\n";
-                  response +=
-                      "*" + std::to_string(keyValuePairs.size()) + "\r\n";
 
-                  for (auto &elem : keyValuePairs) {
-                    response += "$" + std::to_string(elem.size()) + "\r\n" +
-                                elem + "\r\n";
-                  }
+                  std::string keyValuePairsString =
+                      ProtocolGenerator::createArray(keyValuePairs);
+
+                  std::string entryString = ProtocolGenerator::createArray(
+                      {entry_id, keyValuePairsString}, 0);
+                  response += entryString;
+                  // response +=
+                  //     "*" + std::to_string(keyValuePairs.size()) + "\r\n";
+
+                  // for (auto &elem : keyValuePairs) {
+                  //   response += "$" + std::to_string(elem.size()) + "\r\n" +
+                  //               elem + "\r\n";
+                  // }
                 }
               }
             }
