@@ -715,8 +715,6 @@ void handleClient(int client_fd, const std::string &dir,
             } else {
 
               // format the output in RESP.
-              // response = "*" + std::to_string(streamsToOutput.size()) +
-              // "\r\n";
               std::vector<std::string> streamsStringList;
               for (auto &[stream_key, entries] : streamsToOutput) {
                 std::vector<std::string> entriesStringList;
@@ -738,6 +736,8 @@ void handleClient(int client_fd, const std::string &dir,
               }
               response = ProtocolGenerator::createArray(streamsStringList, 0);
             }
+
+            // INCR -> increments a specified integer key
           } else if (command == "incr") {
             std::string key = message.elements[1].value;
 
@@ -748,9 +748,10 @@ void handleClient(int client_fd, const std::string &dir,
 
             // extract value
             std::string curValueString = keyValue[key];
+
+            // check whether the value is indeed an integer and in range.
             int curValue = -1;
             bool validValue = true;
-
             try {
               curValue = std::stoi(curValueString);
             } catch (...) {
@@ -758,6 +759,7 @@ void handleClient(int client_fd, const std::string &dir,
             }
             if (!validValue) {
               response = "-ERR value is not an integer or out of range\r\n";
+              // integer is valid, carry on with the incrementing
             } else {
               // increment value
               curValue++;
@@ -766,7 +768,7 @@ void handleClient(int client_fd, const std::string &dir,
               curValueString = std::to_string(curValue);
               keyValue[key] = curValueString;
 
-              response = ":" + curValueString + "\r\n";
+              response = ProtocolGenerator::createInteger(curValueString);
             }
           } else if (command == "multi") {
             transactionBegun = true;
