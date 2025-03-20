@@ -606,7 +606,7 @@ void handleClient(int client_fd, const std::string &dir,
               //     {entry_id, keyValuePairsString}, 0);
               std::string entryString = ProtocolGenerator::createArray(
                   {entry_id, keyValuePairsString}, 0);
-              entriesString.emplace_back(entryString)
+              entriesString.emplace_back(entryString);
             }
             response = ProtocolGenerator::createArray(entriesString, 0);
           } else if (command == "xread") {
