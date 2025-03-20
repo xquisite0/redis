@@ -715,14 +715,10 @@ void handleClient(int client_fd, const std::string &dir,
             } else {
 
               // format the output in RESP.
-              response = "*" + std::to_string(streamsToOutput.size()) + "\r\n";
+              // response = "*" + std::to_string(streamsToOutput.size()) +
+              // "\r\n";
+              std::vector<std::string> streamsStringList;
               for (auto &[stream_key, entries] : streamsToOutput) {
-                // response += "*2\r\n";
-                // response += "$" + std::to_string(stream_key.size()) + "\r\n"
-                // +
-                //             stream_key + "\r\n";
-
-                // response += "*" + std::to_string(entries.size()) + "\r\n";
                 std::vector<std::string> entriesStringList;
                 for (auto &[entry_id, keyValuePairs] : entries) {
 
@@ -731,7 +727,6 @@ void handleClient(int client_fd, const std::string &dir,
 
                   std::string entryString = ProtocolGenerator::createArray(
                       {entry_id, keyValuePairsString}, 0);
-                  // response += entryString;
                   entriesStringList.emplace_back(entryString);
                 }
                 std::string entriesString =
@@ -739,8 +734,9 @@ void handleClient(int client_fd, const std::string &dir,
 
                 std::string streamString = ProtocolGenerator::createArray(
                     {stream_key, entriesString}, 0);
-                response += streamString;
+                streamsStringList.emplace_back(streamString);
               }
+              response = ProtocolGenerator::createArray(streamsStringList, 0);
             }
           } else if (command == "incr") {
             std::string key = message.elements[1].value;
