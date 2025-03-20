@@ -607,9 +607,23 @@ void handleClient(int client_fd, const std::string &dir,
             }
             response = ProtocolGenerator::createArray(entriesString, 0);
 
+            // XREAD -> reads entries from 1 or more streams
+            // BLOCK argument -> command will block for a specified amount of
+            // time blockMilliseconds before retrieving entries $ argument ->
+            // command will only return new stream entries past the
+            // maxMilliseconds & maxSequenceNumber recorded in the latest entry
+            // from XADD based on entry ID.
           } else if (command == "xread") {
+
+            // a list of {stream_key, start entry ID} -> for each list element
+            // here, return all entries from stream_key, that is after start
+            // entry ID.
             std::vector<std::pair<std::string, std::string>> stream_keys_start;
 
+            // process the command line arguments to get the following
+            // 1) a list of stream keys and their corresponding starting entry
+            // IDs to return from 2) blockMilliseconds - time to block execution
+            // for.
             int streamsIndexStart = -1;
             long long blockMilliseconds = -1;
             bool entriesPresent = false;
@@ -622,11 +636,15 @@ void handleClient(int client_fd, const std::string &dir,
               }
             }
 
+            // sleep for blockMilliseconds
             if (blockMilliseconds != -1) {
               std::this_thread::sleep_for(
                   std::chrono::milliseconds(blockMilliseconds));
             }
 
+            // extract stream keys & their corresponding start entry IDs, that
+            // we should start looking from in our XREAD, not necessarily their
+            // first entries in the stream,
             int stream_count =
                 ((int)message.elements.size() - streamsIndexStart) / 2;
             for (int i = streamsIndexStart;
@@ -635,14 +653,22 @@ void handleClient(int client_fd, const std::string &dir,
                   std::make_pair(message.elements[i].value,
                                  message.elements[stream_count + i].value));
             }
+
             std::vector<std::pair<
                 std::string,
                 std::vector<std::pair<std::string, std::vector<std::string>>>>>
                 streamsToOutput;
+
+            // do while loop to look for any entries every 0.1s.
+            // this code block repeats when the block timoeut is 0
+            // to make sure that block until at least 1 entry can be returned as
+            // per the documentation.
             do {
               streamsToOutput.clear();
               for (auto &[stream_key, start] : stream_keys_start) {
 
+                // $ represents that we will only look for new entries after the
+                // XREAD command was given.
                 if (start == "$") {
                   start = std::to_string(maxMillisecondsTime) + "-" +
                           std::to_string(maxSequenceNumber);
@@ -650,12 +676,17 @@ void handleClient(int client_fd, const std::string &dir,
 
                 auto [startMillisecondsTime, startSequenceNumber] =
                     extractMillisecondsAndSequence(start, stream_key, streams);
+
+                // {stream_key, list of {entry_id, entry key-value pairs}}
                 std::pair<std::string,
                           std::vector<
                               std::pair<std::string, std::vector<std::string>>>>
                     curStream;
                 curStream.first = stream_key;
 
+                // for the current stream, append entries that are after our
+                // starting entryID as specified in the start variable in this
+                // scope.
                 for (auto &entry : streams[stream_key]) {
                   auto [entry_id, keyValuePairs] = entry;
                   auto [curMillisecondsTime, curSequenceNumber] =
@@ -680,7 +711,7 @@ void handleClient(int client_fd, const std::string &dir,
             } while (blockMilliseconds == 0 && !entriesPresent);
 
             if (blockMilliseconds != -1 && !entriesPresent) {
-              response = "$-1\r\n";
+              response = ProtocolGenerator::createNullBulkString();
             } else {
               response = "*" + std::to_string(streamsToOutput.size()) + "\r\n";
               for (auto &[stream_key, entries] : streamsToOutput) {
