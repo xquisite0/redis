@@ -864,7 +864,6 @@ void executeHandshake(const std::string &dir, const std::string &dbfilename,
 
   // Step 1 of Handshake: replica sends PING to master.
   std::string message = ProtocolGenerator::createArray({"PING"});
-  // std::string message = "*1\r\n$4\r\nPING\r\n";
 
   send(clientSocket, message.c_str(), message.size(), 0);
 
@@ -880,7 +879,8 @@ void executeHandshake(const std::string &dir, const std::string &dbfilename,
   send(clientSocket, message.c_str(), message.size(), 0);
   response = receiveResponse(clientSocket);
 
-  message = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
+  message = ProtocolGenerator::createArray({"REPLCONF", "capa", "psync2"});
+  // message = "*3\r\n$8\r\nREPLCONF\r\n$4\r\ncapa\r\n$6\r\npsync2\r\n";
 
   send(clientSocket, message.c_str(), message.size(), 0);
 
@@ -888,7 +888,8 @@ void executeHandshake(const std::string &dir, const std::string &dbfilename,
 
   // Step 3 of Handshake: replica sends PSYNC as a request to synchronise states
   // with the master. Receives RDB file from the master.
-  message = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
+  message = ProtocolGenerator::createArray({"PSYNC", "?", "-1"});
+  // message = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
 
   send(clientSocket, message.c_str(), message.size(), 0);
 
