@@ -808,11 +808,12 @@ void handleClient(int client_fd, const std::string &dir,
         replica_offset += message.rawMessage.size();
       }
 
-      // keeps track of the response in each command in a transaction
+      // keeps track of the response in each command in a transaction, while
+      // we're executing the transaction
       if (transactionExecuting) {
         transactionResponses.push_back(response);
       }
-
+      // do-while loop repeats until all transactions are processed.
     } while (transactionExecuting &&
              transactionNumber < transactionCommands.size());
 
@@ -861,13 +862,14 @@ void executeHandshake(const std::string &dir, const std::string &dbfilename,
     return;
   }
 
+  // Step 1 of Handshake: replica sends PING to master.
   std::string message = "*1\r\n$4\r\nPING\r\n";
 
-  // Send PING message
   send(clientSocket, message.c_str(), message.size(), 0);
 
   std::string response = receiveResponse(clientSocket);
 
+  // Step 2 of Handshake: replica sends 2 REPLCONF commands to master.
   message = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$" +
             std::to_string(std::to_string(port).size()) + "\r\n" +
             std::to_string(port) + "\r\n";
@@ -881,6 +883,8 @@ void executeHandshake(const std::string &dir, const std::string &dbfilename,
 
   response = receiveResponse(clientSocket);
 
+  // Step 3 of Handshake: replica sends PSYNC as a request to synchronise states
+  // with the master. Receives RDB file from the master.
   message = "*3\r\n$5\r\nPSYNC\r\n$1\r\n?\r\n$2\r\n-1\r\n";
 
   send(clientSocket, message.c_str(), message.size(), 0);
@@ -891,11 +895,18 @@ void executeHandshake(const std::string &dir, const std::string &dbfilename,
   // should be the fullresync message
   RedisMessage parsedResponse = parser.parse();
 
-  // should be the RDB file
   parser.reset();
+
+  // isRDB is a flag that helps with our processing as RDB files are not in RESP
+  // format, and do not have a trailing CRLF
   parser.isRDB = true;
+
+  // should be the RDB file
   parsedResponse = parser.parse();
   parser.isRDB = false;
+
+  // There should be code here that allows replica to synchronise state with the
+  // master. But for simulation purposes, the RDB file given is empty.
 
   std::thread(handleClient, clientSocket, dir, dbfilename, port, replicaof,
               true)
