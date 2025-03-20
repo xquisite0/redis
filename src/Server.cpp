@@ -871,9 +871,11 @@ void executeHandshake(const std::string &dir, const std::string &dbfilename,
   std::string response = receiveResponse(clientSocket);
 
   // Step 2 of Handshake: replica sends 2 REPLCONF commands to master.
-  message = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$" +
-            std::to_string(std::to_string(port).size()) + "\r\n" +
-            std::to_string(port) + "\r\n";
+  message = ProtocolGenerator::createArray(
+      {"REPLCONF", "listening-port", std::to_string(port)});
+  // message = "*3\r\n$8\r\nREPLCONF\r\n$14\r\nlistening-port\r\n$" +
+  //           std::to_string(std::to_string(port).size()) + "\r\n" +
+  //           std::to_string(port) + "\r\n";
 
   send(clientSocket, message.c_str(), message.size(), 0);
   response = receiveResponse(clientSocket);
