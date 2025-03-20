@@ -770,15 +770,25 @@ void handleClient(int client_fd, const std::string &dir,
 
               response = ProtocolGenerator::createInteger(curValueString);
             }
+            // MULTI -> starts a transaction, i.e. all commands after will be
+            // queued, and batch executed when EXEC is given.
           } else if (command == "multi") {
+
+            // begin the transaction
             transactionBegun = true;
+
+            // reset the transaction data from any previous transactions
             transactionCommands.clear();
             transactionResponses.clear();
-            response = "+OK\r\n";
+
+            response = ProtocolGenerator::createSimpleString("OK");
+            // EXEC -> batch execute the transaction.
+            // by right, this should be executed way above on the line of "if
+            // (transactionBegun)". since EXEC came here, it means that
+            // transaction has not begun and EXEC was given.
           } else if (command == "exec") {
-            if (!transactionBegun) {
-              response = "-ERR EXEC without MULTI\r\n";
-            }
+
+            response = "-ERR EXEC without MULTI\r\n";
           } else if (command == "discard") {
             response = "-ERR DISCARD without MULTI\r\n";
           }
