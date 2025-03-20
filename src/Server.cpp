@@ -608,8 +608,10 @@ void handleClient(int client_fd, const std::string &dir,
 
               response += ProtocolGenerator::createArray(
                   {entry_id, keyValuePairsString}, 0);
-              std::cout << ProtocolGenerator::createArray(
-                  {entry_id, keyValuePairsString}, 0);
+              std::cout << "\n\nResponse: "
+                        << ProtocolGenerator::createArray(
+                               {entry_id, keyValuePairsString}, 0)
+                        << "\n\n";
             }
           } else if (command == "xread") {
             std::vector<std::pair<std::string, std::string>> stream_keys_start;
