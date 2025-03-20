@@ -785,12 +785,18 @@ void handleClient(int client_fd, const std::string &dir,
             // EXEC -> batch execute the transaction.
             // by right, this should be executed way above on the line of "if
             // (transactionBegun)". since EXEC came here, it means that
-            // transaction has not begun and EXEC was given.
+            // transaction has not begun and EXEC was given, making this an
+            // invalid command as there is no transaction to execute!
           } else if (command == "exec") {
-
-            response = "-ERR EXEC without MULTI\r\n";
+            response =
+                ProtocolGenerator::createErrorMessage("EXEC without MULTI");
+            // DISCARD -> discard the transaction
+            // same case, as the previous exec command. since we came to this
+            // line, this means that transaction has not begun, thus there is no
+            // transaction to discard in the first place, making this invalid.
           } else if (command == "discard") {
-            response = "-ERR DISCARD without MULTI\r\n";
+            response =
+                ProtocolGenerator::createErrorMessage("DISCARD without MULTI");
           }
         }
       }
