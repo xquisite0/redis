@@ -9,7 +9,7 @@ std::string createBulkString(std::string str) {
   return "$" + std::to_string(str.size()) + "\r\n" + str + "\r\n";
 }
 
-std::string createArray(std::vector<std::string> strs, bool isPureStrings = 1) {
+std::string createArray(std::vector<std::string> strs, bool isPureStrings) {
   std::string response = "*" + std::to_string(strs.size()) + "\r\n";
 
   for (std::string &str : strs) {
