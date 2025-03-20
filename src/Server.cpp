@@ -599,18 +599,14 @@ void handleClient(int client_fd, const std::string &dir,
 
               auto [entry_id, keyValuePairs] = entry;
 
-              response += "$" + std::to_string(entry_id.size()) + "\r\n" +
-                          entry_id + "\r\n";
+              // response += "$" + std::to_string(entry_id.size()) + "\r\n" +
+              //             entry_id + "\r\n";
 
-              response += ProtocolGenerator::createArray(keyValuePairs);
-              // response += "*" + std::to_string(keyValuePairs.size()) +
-              // "\r\n";
+              std::string keyValuePairsString =
+                  ProtocolGenerator::createArray(keyValuePairs);
 
-              // for (std::string &elem : keyValuePairs) {
-              //   response +=
-              //       "$" + std::to_string(elem.size()) + "\r\n" + elem +
-              //       "\r\n";
-              // }
+              response += ProtocolGenerator::createArray(
+                  {entry_id, keyValuePairsString}, 0);
             }
           } else if (command == "xread") {
             std::vector<std::pair<std::string, std::string>> stream_keys_start;
