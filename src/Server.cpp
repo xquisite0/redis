@@ -717,31 +717,28 @@ void handleClient(int client_fd, const std::string &dir,
               // format the output in RESP.
               response = "*" + std::to_string(streamsToOutput.size()) + "\r\n";
               for (auto &[stream_key, entries] : streamsToOutput) {
-                response += "*2\r\n";
-                response += "$" + std::to_string(stream_key.size()) + "\r\n" +
-                            stream_key + "\r\n";
+                // response += "*2\r\n";
+                // response += "$" + std::to_string(stream_key.size()) + "\r\n"
+                // +
+                //             stream_key + "\r\n";
 
-                response += "*" + std::to_string(entries.size()) + "\r\n";
+                // response += "*" + std::to_string(entries.size()) + "\r\n";
+                std::vector<std::string> entriesStringList;
                 for (auto &[entry_id, keyValuePairs] : entries) {
-                  // response += "*2\r\n";
-                  // response += "$" + std::to_string(entry_id.size()) + "\r\n"
-                  // +
-                  //             entry_id + "\r\n";
 
                   std::string keyValuePairsString =
                       ProtocolGenerator::createArray(keyValuePairs);
 
                   std::string entryString = ProtocolGenerator::createArray(
                       {entry_id, keyValuePairsString}, 0);
-                  response += entryString;
-                  // response +=
-                  //     "*" + std::to_string(keyValuePairs.size()) + "\r\n";
-
-                  // for (auto &elem : keyValuePairs) {
-                  //   response += "$" + std::to_string(elem.size()) + "\r\n" +
-                  //               elem + "\r\n";
-                  // }
+                  // response += entryString;
+                  entriesStringList.emplace_back(entryString);
                 }
+                std::string entriesString =
+                    ProtocolGenerator::createArray(entriesStringList, 0);
+
+                std::string streamString = ProtocolGenerator::createArray(
+                    {stream_key, entriesString}, 0);
               }
             }
           } else if (command == "incr") {
