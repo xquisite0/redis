@@ -863,7 +863,8 @@ void executeHandshake(const std::string &dir, const std::string &dbfilename,
   }
 
   // Step 1 of Handshake: replica sends PING to master.
-  std::string message = "*1\r\n$4\r\nPING\r\n";
+  std::string message = ProtocolGenerator::createArray({"PING"});
+  // std::string message = "*1\r\n$4\r\nPING\r\n";
 
   send(clientSocket, message.c_str(), message.size(), 0);
 
