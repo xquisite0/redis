@@ -594,25 +594,21 @@ void handleClient(int client_fd, const std::string &dir,
 
             // we now have to format the entriesToOutput into RESP format
             response = "*" + std::to_string(entriesToOutput.size()) + "\r\n";
+            std::vector<std::string> entriesString;
             for (auto &entry : entriesToOutput) {
-              // response += "*2\r\n";
 
               auto [entry_id, keyValuePairs] = entry;
 
-              // response += "$" + std::to_string(entry_id.size()) + "\r\n" +
-              //             entry_id + "\r\n";
-
               std::string keyValuePairsString =
                   ProtocolGenerator::createArray(keyValuePairs);
-              // response += keyValuePairsString;
 
-              response += ProtocolGenerator::createArray(
+              // response += ProtocolGenerator::createArray(
+              //     {entry_id, keyValuePairsString}, 0);
+              std::string entryString = ProtocolGenerator::createArray(
                   {entry_id, keyValuePairsString}, 0);
-              std::cout << "\n\nResponse: "
-                        << ProtocolGenerator::createArray(
-                               {entry_id, keyValuePairsString}, 0)
-                        << "\n\n";
+              entriesString.emplace_back(entryString)
             }
+            response = ProtocolGenerator::createArray(entriesString, 0);
           } else if (command == "xread") {
             std::vector<std::pair<std::string, std::string>> stream_keys_start;
 
