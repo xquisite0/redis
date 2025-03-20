@@ -1,5 +1,6 @@
+#include "../include/ProtocolGenerator.h"
+#include "../include/util.h"
 #include "ProtocolParser.h"
-#include "util.cpp"
 #include <arpa/inet.h>
 #include <chrono>
 #include <cstdlib>
@@ -21,196 +22,43 @@
 #include <unordered_map>
 #include <unordered_set>
 
+// replication ID of the master. hard coded for test purposes.
 std::string master_replid = "8371b4fb1155b71f4a04d3e1bc3e18c4a990aeeb";
+// keeps track of the number of bytes of propagated commands
 int master_repl_offset = 0;
+// a list of all sockets that refer to the current master server
 std::vector<int> replicaSockets;
 
-// key should map should some sort of data structure for entries
 std::unordered_set<std::string> streamKeys;
 
-// stream_key -> entries
+// stream_key -> entries -> entry (id, key-value pairs)
 // each entry is a id, and a list of its key-value pairs represented in a vector
 std::unordered_map<
     std::string, std::vector<std::pair<std::string, std::vector<std::string>>>>
     streams;
+
+// our main data structure for regular SET & state changing commands
 std::unordered_map<std::string, std::string> keyValue;
-bool propagated = false;
 int master_fd = -1;
 int replica_offset = 0;
+
+// mtx governs the read & writing of syncedReplicas
 std::mutex mtx;
 int syncedReplicas = 0;
+
+// for streams processing with XREAD's $ argument.
+// Allows us to check for any new stream entries after the XREAD command.
 long long maxMillisecondsTime = 0;
 int maxSequenceNumber = 1;
 
-static void readBytes(std::ifstream &is, char *buffer, int length) {
-  if (!is.read(buffer, length)) {
-    throw std::runtime_error("Unexpected EOF when reading RDB file");
-  }
-}
-
-static uint8_t readByte(std::ifstream &is) {
-  char byte;
-  if (!is.read(&byte, 1)) {
-    throw std::runtime_error("Unexpected EOF when reading RDB file");
-  }
-  return static_cast<uint8_t>(byte);
-}
-
-int readLength(std::ifstream &is, bool &isValue) {
-  uint8_t firstByte = readByte(is);
-
-  uint8_t flag = (firstByte & 0xC0) >> 6;
-  uint8_t value = firstByte & 0x3F;
-
-  if (flag == 0) {
-    return value;
-  } else if (flag == 1) {
-    uint8_t secondByte = readByte(is);
-    return value << 8 | secondByte;
-  } else if (flag == 2) {
-    uint8_t secondByte = readByte(is);
-    uint8_t thirdByte = readByte(is);
-    uint8_t fourthByte = readByte(is);
-    uint8_t fifthByte = readByte(is);
-    return fifthByte << 24 | fourthByte << 16 | thirdByte << 8 | secondByte;
-  } else if (flag == 3) {
-    isValue = true;
-    if (value == 0) {
-      uint8_t secondByte = readByte(is);
-      return secondByte;
-    } else if (value == 1) {
-      uint8_t secondByte = readByte(is);
-      uint8_t thirdByte = readByte(is);
-      return thirdByte << 8 | secondByte;
-    } else if (value == 2) {
-      uint8_t secondByte = readByte(is);
-      uint8_t thirdByte = readByte(is);
-      uint8_t fourthByte = readByte(is);
-      uint8_t fifthByte = readByte(is);
-      return fifthByte << 24 | fourthByte << 16 | thirdByte << 8 | secondByte;
-    }
-  }
-  return -1;
-}
-
-void parseRDB(
-    std::unordered_map<std::string, std::string> &keyValue,
-    std::unordered_map<std::string, unsigned long long> &keyStartExpiry,
-    std::string dir, std::string dbfilename) {
-
-  if (dir == "" && dbfilename == "")
-    return;
-  // read the file
-  std::ifstream is(dir + "/" + dbfilename);
-  if (!is.is_open()) {
-    std::cerr << "Error: File could not be opened!" << std::endl;
-    return;
-  }
-
-  // identify keys segment
-
-  // skip header section
-  char header[9];
-  is.read(header, 9);
-
-  bool expirySet = false;
-  unsigned long long expiryTimestamp = -1;
-  // process segments
-  while (true) {
-    uint8_t opcode = readByte(is);
-
-    // metadata section
-    if (opcode == 0xFA) {
-      bool isValue = false;
-      int length = readLength(is, isValue);
-      char name[length];
-      is.read(name, length);
-
-      isValue = false;
-      length = readLength(is, isValue);
-      std::string value;
-      if (isValue) {
-        value = length;
-      } else {
-        is.read(&value[0], length);
-      }
-    } else if (opcode == 0xFE) {
-      bool isValue = false;
-      int databaseIndex = readLength(is, isValue);
-    } else if (opcode == 0xFB) {
-      bool isValue = false;
-      int keyValueHashSize = readLength(is, isValue);
-
-      isValue = false;
-      int expiryHashSize = readLength(is, isValue);
-    } else if (opcode == 0x00) {
-
-      bool isValue = false;
-      int length = readLength(is, isValue);
-      std::string key(length, '\0');
-      is.read(&key[0], length);
-
-      isValue = false;
-      length = readLength(is, isValue);
-      std::string val(length, '\0');
-      is.read(&val[0], length);
-
-      keyValue[key] = val;
-
-      if (expiryTimestamp != -1) {
-        keyStartExpiry[key] = expiryTimestamp;
-        expirySet = false;
-      }
-    } else if (opcode == 0xFC) {
-      unsigned long long time = 0;
-      for (int i = 0; i < 8; i++) {
-        unsigned long long byte = readByte(is);
-        time |= (byte << (8 * i));
-        // time |= byte;
-      }
-      expiryTimestamp = time;
-      expirySet = true;
-    } else if (opcode == 0xFD) {
-      unsigned long long time = 0;
-      for (int i = 0; i < 4; i++) {
-        unsigned long long byte = readByte(is);
-        // time <<= 8;
-        // time |= byte;
-        time |= (byte << (8 * i));
-      }
-      expiryTimestamp = time * 1000;
-      expirySet = true;
-    } else if (opcode == 0xFF) {
-      char checksum[8];
-      readBytes(is, checksum, 8);
-      break;
-    }
-  }
-}
-
-std::string receiveResponse(int socketFd) {
-  std::string response;
-  const size_t bufferSize = 1024; // Buffer size for receiving chunks of data
-  char buffer[bufferSize];
-
-  ssize_t bytesReceived;
-  bytesReceived = recv(socketFd, buffer, sizeof(buffer) - 1, 0);
-  response += buffer;
-
-  if (bytesReceived == 0) {
-    std::cout << "Server closed the connection.\n";
-  } else if (bytesReceived < 0) {
-    std::cerr << "Error receiving data.\n";
-  }
-
-  return response;
-}
-
+// our main function: Helps to keep handle all Command Processing
 void handleClient(int client_fd, const std::string &dir,
                   const std::string &dbfilename, int port,
                   std::string replicaof, bool isPropagation) {
+
   std::unordered_map<std::string, unsigned long long> keyStartExpiry;
 
+  // following variables help with transaction processing.
   bool transactionBegun = false;
   bool transactionExecuting = false;
   std::vector<RedisMessage> transactionCommands;
@@ -219,53 +67,64 @@ void handleClient(int client_fd, const std::string &dir,
   // restore state of Redis with persistence.
   parseRDB(keyValue, keyStartExpiry, dir, dbfilename);
 
-  auto now = std::chrono::system_clock::now();
-
-  // Convert to milliseconds since the Unix epoch
-  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-      now.time_since_epoch());
-
   // Get the Unix time in milliseconds
-  long long unix_time_ms = duration.count();
+  long long unix_time_ms = getCurrentUnixTimestamp();
 
+  // Loop allows us to handle commands in streams.
   while (true) {
 
-    // check whether the connection is closed by peeking at the top of the
-    // buffer
     bool sendResponse = true;
 
+    // check whether the connection is closed by peeking at the top of the
+    // buffer.
     char buffer;
     if (recv(client_fd, &buffer, 1, MSG_PEEK) <= 0) {
       break;
     }
+
+    // variable to store our response.
     std::string response;
 
+    // Parses the client's message in Redis Serialisation Protocol (RESP) format
+    // to plain text.
     ProtocolParser parser(client_fd);
     parser.reset();
     RedisMessage message = parser.parse();
 
+    // if transaction has begun, i.e. MULTI has been called, but EXEC hasn't. we
+    // are gathering the commands to be batch executed in the future when EXEC
+    // is called.
     if (transactionBegun) {
+
+      // first extract the command
       std::string command = "";
       for (char &c : message.elements[0].value) {
         command += tolower(c);
       }
+
+      // DISCARD means that we clear our commands and end the transaction
+      // immediately.
       if (command == "discard") {
         transactionCommands.clear();
         transactionBegun = false;
         response = "+OK\r\n";
         send(client_fd, response.c_str(), response.size(), 0);
         continue;
+
+        // A regular command will be pushed into our transactionCommands queue
+        // to be batch processed in the future.
       } else if (command != "exec") {
         transactionCommands.push_back(message);
         response = "+QUEUED\r\n";
 
         send(client_fd, response.c_str(), response.size(), 0);
         continue;
+
+        // we have an EXEC command -> batch execute all commands in
+        // transactionCommands.
       } else {
-        // if (!transactionBegun) {
-        //   response = "-ERR EXEC without MULTI\r\n";
-        //   send(client_fd, response.c_str(), response.size(), 0);
-        // } else {
+
+        // ensures that we do have commands to process in the first place
         if (transactionCommands.empty()) {
           response = "*0\r\n";
           transactionBegun = false;
@@ -273,19 +132,27 @@ void handleClient(int client_fd, const std::string &dir,
           continue;
         }
 
+        // toggles transaction executing mode.
         transactionExecuting = true;
       }
     }
 
+    // keeps track of which command in the transaction we are processing.
     int transactionNumber = 0;
 
+    // do while loop ensures that if no transaction is happening, the current
+    // client command will still be processed once and if a transaction is
+    // happening, the while condition kicks in.
     do {
       response = "";
+
+      // grabs the next transaction command, if we are in transaction executing
+      // mode.
       if (transactionExecuting) {
         message = transactionCommands[transactionNumber];
         transactionNumber++;
       }
-      // Checking for ECHO command
+
       if (!message.elements.empty()) {
         RedisMessage firstElement = message.elements[0];
         if (firstElement.type == BULK_STRING) {
@@ -294,37 +161,44 @@ void handleClient(int client_fd, const std::string &dir,
           for (char c : firstElement.value) {
             command += tolower(c);
           }
-          if (command == "echo") {
-            response = "+" + message.elements[1].value + "\r\n";
 
+          // ECHO just needs us to return the 1st argument
+          if (command == "echo") {
+            response = ProtocolGenerator::createSimpleString(
+                message.elements[1].value);
+
+            // response for PING is PONG
           } else if (command == "ping") {
-            response = "+PONG\r\n";
+            response = ProtocolGenerator::createSimpleString("PONG");
 
           } else if (command == "set") {
 
+            // ensure that we propagate this command to all of our replicas to
+            // keep state synchronised.
             master_repl_offset += message.rawMessage.size();
             for (int fd : replicaSockets) {
               send(fd, message.rawMessage.c_str(), message.rawMessage.size(),
                    0);
             }
-            keyValue[message.elements[1].value] = message.elements[2].value;
 
-            response = "+OK\r\n";
+            std::string key = message.elements[1].value,
+                        value = message.elements[2].value;
+            keyValue[key] = value;
 
+            response = ProtocolGenerator::createSimpleString("OK");
+
+            // handles the case where an expiry timeout is given for this SET
+            // key-value pair.
             if (message.elements.size() > 2) {
               if (message.elements[3].value == "px") {
-                auto now = std::chrono::system_clock::now();
-
-                // Convert to milliseconds since the Unix epoch
-                auto duration =
-                    std::chrono::duration_cast<std::chrono::milliseconds>(
-                        now.time_since_epoch());
-
-                // Get the Unix time in milliseconds
-                long long unix_time_ms = duration.count();
+                // Get the Unix time in milliseconds & calculate the expiry
+                // timestamp
+                long long unix_time_ms = getCurrentUnixTimestamp();
                 long long expiryTimestamp =
                     unix_time_ms + stoll(message.elements[4].value);
 
+                // all get commands for this key-value pair, past this expiry
+                // timestamp will return NULL.
                 keyStartExpiry[message.elements[1].value] = expiryTimestamp;
               }
             }
@@ -334,109 +208,140 @@ void handleClient(int client_fd, const std::string &dir,
 
             // key has not been set
             if (keyValue.find(message.elements[1].value) == keyValue.end()) {
-              response = "$-1\r\n";
+              response = ProtocolGenerator::createNullBulkString();
               valid = false;
             }
-            // check for expiry
+
+            // check for expiry, if expired, the key no longer exists and we
+            // return null.
             if (keyStartExpiry.find(message.elements[1].value) !=
                 keyStartExpiry.end()) {
-              auto now = std::chrono::system_clock::now();
-
-              // Convert to milliseconds since the Unix epoch
-              auto duration =
-                  std::chrono::duration_cast<std::chrono::milliseconds>(
-                      now.time_since_epoch());
 
               // Get the Unix time in milliseconds
-              unsigned long long get_time = duration.count();
+              unsigned long long get_time = getCurrentUnixTimestamp();
               unsigned long long expiryTimestamp =
                   keyStartExpiry[message.elements[1].value];
               if (get_time > expiryTimestamp) {
-                response = "$-1\r\n";
+                response = ProtocolGenerator::createNullBulkString();
                 valid = false;
               }
             }
 
+            // if key exists + has not timed out we can return the value.
             if (valid) {
               std::string value = keyValue[message.elements[1].value];
-              response =
-                  "$" + std::to_string(value.size()) + "\r\n" + value + "\r\n";
+              response = ProtocolGenerator::createBulkString(value);
             }
           } else if (command == "config") {
-            // CONFIG GET
+            // CONFIG GET -> requires us to output the directory & dbfilename of
+            // RDB files that we can reference to synchronise our state with
+            // what it was previously
             if (message.elements.size() >= 2 &&
                 strcasecmp(message.elements[1].value.c_str(), "get") == 0) {
               if (message.elements[2].value == "dir") {
-                response = "*2\r\n$3\r\ndir\r\n$" + std::to_string(dir.size()) +
-                           "\r\n" + dir + "\r\n";
+                response = ProtocolGenerator::createArray({"dir", dir});
               } else if (message.elements[2].value == "dbfilename") {
-                response = "*2\r\n$10\r\ndbfilename\r\n$" +
-                           std::to_string(dbfilename.size()) + "\r\n" +
-                           dbfilename + "\r\n";
+                response =
+                    ProtocolGenerator::createArray({"dbfilename", dbfilename});
               }
             }
+            // KEYS -> return all the keys in storage
           } else if (command == "keys") {
             // assume that "*" is passed in.
             if (strcasecmp(message.elements[1].value.c_str(), "*") == 0) {
               // pull that out
-              response = "*" + std::to_string(keyValue.size()) + "\r\n";
+              std::vector<std::string> keys;
 
               for (auto elem : keyValue) {
                 std::string key = elem.first;
-                response +=
-                    "$" + std::to_string(key.size()) + "\r\n" + key + "\r\n";
+                keys.emplace_back(key);
               }
+              response = ProtocolGenerator::createArray(keys);
             }
-          } else if (command == "info") {
-            // assume that the key is replication
 
+            // INFO replication -> returns information about the server
+          } else if (command == "info") {
+
+            // for master servers, we return the role, replication ID &
+            // replication offset.
             if (replicaof == "") {
-              // std::string offsetstd::to_string(master_repl_offset)
-              std::string response_string =
+              response = ProtocolGenerator::createBulkString(
                   "role:master\r\nmaster_replid:" + master_replid +
                   "\r\nmaster_repl_offset:" +
-                  std::to_string(master_repl_offset);
-              response = "$" + std::to_string(response_string.size()) + "\r\n" +
-                         response_string + "\r\n";
+                  std::to_string(master_repl_offset));
+
+              // for replica servers, we just return the role
             } else {
-              response = "$10\r\nrole:slave\r\n";
+              response = ProtocolGenerator::createBulkString("role:slave");
             }
+
           } else if (command == "replconf") {
+
+            // for master servers
             if (replicaof == "") {
-              response = "+OK\r\n";
+
+              // in general, replconf is sent as part of the replica-master
+              // handshake. and the default response is OK.
+              response = ProtocolGenerator::createSimpleString("OK");
+
+              // however, other times, we could be sending a REPLCONF GETACK to
+              // our replicas replicas will then return a REPLCONF ACK
+              // replica_offset to us. we can use this replica_offset to track
+              // the total number of replicas that are fully synced with our
+              // master server
               if (message.elements.size() >= 3 &&
                   message.elements[1].value == "ACK") {
+
+                // we do not need to reply to replica's response
                 sendResponse = false;
                 int offset = stoi(message.elements[2].value);
 
+                // we check whether offset (number of bytes of propagated
+                // commands PROCESSED & HANDLED by the replica)... is equal to
+                // master_repl_offset (number of bytes of commands PROPAGATED by
+                // the master to the replicas)
                 if (offset == master_repl_offset) {
-                  std::unique_lock<std::mutex> lock(mtx); // Lock the mutex
+                  // we lock the mutex that is controlling the syncedReplicas
+                  // variable as there are multiple replica-master connections
+                  // happening in parallel. this prevents any race conditions.
+                  std::unique_lock<std::mutex> lock(mtx);
                   ++syncedReplicas;
                 }
               }
 
-              /*
-
-              include code here NA2. WAIT with multiple commands.
-
-              */
+              // in this case, we are a replica handling the REPLCONF GETACK *
+              // command, which.. needs us to respond with our replica_offset,
+              // i.e. number of bytes of propagated commands from the master
+              // PROCESSED & HANDLED by us.
             } else {
               if (message.elements.size() >= 3) {
                 if (message.elements[1].value == "GETACK") {
                   if (message.elements[2].value == "*") {
-                    response =
-                        "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$" +
-                        std::to_string(std::to_string(replica_offset).size()) +
-                        "\r\n" + std::to_string(replica_offset) + "\r\n";
+
+                    response = ProtocolGenerator::createArray(
+                        {"REPLCONF", "ACK", std::to_string(replica_offset)});
                   }
                 }
               }
+              // by default, replicas usually don't send responses when
+              // processing propagated commands from the master. however, this
+              // is an exception, when the master deliberately wants a response
+              // from us, hence the explicit socket send().
               send(client_fd, response.c_str(), response.size(), 0);
             }
-          } else if (command == "psync") {
-            response = "+FULLRESYNC " + master_replid + " " +
-                       std::to_string(master_repl_offset) + "\r\n";
 
+            // PSYNC -> part of the master-replica handshake process.
+            // PSYNC is sent by the replica as a request to synchronise states
+            // with the master the master (us now) will respond with FULLRESYNC
+            // & a RDB file (empty for test purposes) that the newly created
+            // replica can use to synchronise its state with the master
+          } else if (command == "psync") {
+            response = ProtocolGenerator::createSimpleString(
+                "FULLRESYNC " + master_replid + " " +
+                std::to_string(master_repl_offset));
+
+            // explicit send, as we have to send the RDB file as well in this
+            // same command.
             send(client_fd, response.c_str(), response.size(), 0);
 
             // send our RDB file for replica to sync to
@@ -449,6 +354,7 @@ void handleClient(int client_fd, const std::string &dir,
                 "b0"
                 "c41000fa08616f662d62617365c000fff06e3bfec0ff5aa2";
 
+            // converts hex RDB file to binary
             std::string bytes = "";
             for (size_t i = 0; i < emptyRDB.length(); i += 2) {
               std::string byteString = emptyRDB.substr(i, 2);
@@ -457,39 +363,81 @@ void handleClient(int client_fd, const std::string &dir,
               bytes.push_back(byte);
             }
 
+            // NOT a RESP bulk string (see the ommission of \r\n at the end). we
+            // can't use our ProtocolGenerator here.
             response = "$" + std::to_string(bytes.size()) + "\r\n" + bytes;
 
+            // handshake process is completed at this step! we can add this
+            // replica to our list of replicaSocket :)
             replicaSockets.push_back(client_fd);
+
+            // WAIT -> command used by clients on the master
+            // WAIT will wait for a minimum number of replicas (numreplicas) to
+            // be fully synchronised to our master before returning and
+            // continuing command execution OR it timeouts. WAIT returns the
+            // number of replicas synced, be it above numreplicas or under. WAIT
+            // creates a safety net by ensuring a certain number of replicas are
+            // in sync.
+
+            /*
+            Key details from the Redis Docs on WAIT:
+
+            Note that WAIT does not make Redis a strongly consistent store:
+            while synchronous replication is part of a replicated state machine,
+            it is not the only thing needed. However in the context of Sentinel
+            or Redis Cluster failover, WAIT improves the real world data safety.
+
+            Specifically if a given write is transferred to one or more
+            replicas, it is more likely (but not guaranteed) that if the master
+            fails, we'll be able to promote, during a failover, a replica that
+            received the write: both Sentinel and Redis Cluster will do a
+            best-effort attempt to promote the best replica among the set of
+            available replicas.
+
+            However this is just a best-effort attempt so it is possible to
+            still lose a write synchronously replicated to multiple replicas.
+
+            */
           } else if (command == "wait") {
+
+            // extract arguments
             int numreplicas = stoi(message.elements[1].value);
             int timeout = stoi(message.elements[2].value);
 
+            // if the master has not propagated any commands, all replicas by
+            // default are in sync!
             if (master_repl_offset == 0) {
-              response = ":" + std::to_string(replicaSockets.size()) + "\r\n";
+              response = ProtocolGenerator::createInteger(
+                  std::to_string(replicaSockets.size()));
             } else {
               std::string offsetRequest =
-                  "*3\r\n$8\r\nREPLCONF\r\n$6\r\nGETACK\r\n$1\r\n*\r\n";
+                  ProtocolGenerator::createArray({"REPLCONF", "GETACK", "*"});
 
-              // while (true) {
-              // if (true) {
+              // reset the syncedReplicas count, as new commands may have been
+              // propagated between different instances of WAIT.
               std::unique_lock<std::mutex> lock(mtx);
               syncedReplicas = 0;
               lock.unlock();
-              // }
 
+              // request the replica_offset from all replicas.
+              // syncedReplicas will be updated on each particular
+              // Master-Replica connection when the replica returns with
+              // REPLCONF ACK replica_offset to the Master.
+              // Take note that currently, this is running on the Master-Client
+              // connection... The Master-Replica connections are running
+              // concurrently to this connection!
               for (int fd : replicaSockets) {
                 send(fd, offsetRequest.c_str(), offsetRequest.size(), 0);
               }
 
+              // caculates the timeout timestamp
               auto startTime = std::chrono::steady_clock::now();
-
-              // Define timeout duration (e.g., 5000 milliseconds = 5 seconds)
               std::chrono::milliseconds timeoutDuration(timeout);
-
-              // Calculate the timeout timestamp
               auto timeoutTimestamp = startTime + timeoutDuration;
 
-              // Loop until the current time reaches the timeout
+              // Recheck the syncedReplicas count every 0.1s to check if it is
+              // sufficient. If so, we can return the syncedReplicas count
+              // immediately Checks until timeout.
               while (std::chrono::steady_clock::now() < timeoutTimestamp) {
                 std::unique_lock<std::mutex> lock(mtx);
                 if (syncedReplicas >= numreplicas)
@@ -498,58 +446,82 @@ void handleClient(int client_fd, const std::string &dir,
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
               }
 
+              // Read guard.
               lock.lock();
-              response = ":" + std::to_string(syncedReplicas) + "\r\n";
+              response = ProtocolGenerator::createInteger(
+                  std::to_string(syncedReplicas));
+
+              // requesting the replica_offset from each replica is itself a
+              // propagated command too.
               master_repl_offset += offsetRequest.size();
             }
+
+            // TYPE -> return the type of value a key is.
           } else if (command == "type") {
             std::string key = message.elements[1].value;
 
             if (streamKeys.find(key) != streamKeys.end()) {
-              response = "+stream\r\n";
+              response = ProtocolGenerator::createSimpleString("stream");
             } else if (keyValue.find(key) != keyValue.end()) {
-              response = "+string\r\n";
+              response = ProtocolGenerator::createSimpleString("string");
             } else {
-              response = "+none\r\n";
+              response = ProtocolGenerator::createSimpleString("none");
             }
+
+            // XADD -> appends a specified stream entry to a stream
           } else if (command == "xadd") {
             std::string stream_key = message.elements[1].value;
+
+            // we create the specified stream, if it has not yet been created.
             if (streamKeys.find(stream_key) == streamKeys.end()) {
               streamKeys.insert(stream_key);
             }
-            if (message.elements.size() >= 3) {
-              std::string entry_id = message.elements[2].value;
 
+            if (message.elements.size() >= 3) {
+
+              // extract the millisecondsTime & sequenceNumber of the current
+              // stream entry ID.
+              std::string entry_id = message.elements[2].value;
               auto [millisecondsTime, sequenceNumber] =
                   extractMillisecondsAndSequence(entry_id, stream_key, streams);
 
               bool validEntry = true;
 
+              // verifies the validity of the entry ID of the current stream
+              // entry
               if (millisecondsTime <= 0 && sequenceNumber <= 0) {
-                response = "-ERR The ID specified in XADD must be greater than "
-                           "0-0\r\n";
+                response = ProtocolGenerator::createErrorMessage(
+                    "The ID specified in XADD must be greater than 0-0");
                 validEntry = false;
               } else if (!streams[stream_key].empty()) {
+
+                // checks that the current stream entry is chronologically after
+                // the previous stream entry.
                 auto [prevMillisecondsTime, prevSequenceNumber] =
                     extractMillisecondsAndSequence(
                         streams[stream_key].back().first, stream_key, streams);
                 if (prevMillisecondsTime > millisecondsTime ||
                     (prevMillisecondsTime == millisecondsTime &&
                      prevSequenceNumber >= sequenceNumber)) {
-                  response =
-                      "-ERR The ID specified in XADD is equal or smaller "
-                      "than the target stream top item\r\n";
+                  response = ProtocolGenerator::createErrorMessage(
+                      "The ID specified in XADD is equal or smaller than the "
+                      "target stream top item");
                   validEntry = false;
                 }
               }
 
               // if it is valid, we can add the entry to the stream
               if (validEntry) {
-                // refresh entry id, in case it is a generated one. e.g. we
-                // don't add id "0-*", we add id "0-1" (auto-generated)
+                // there are cases where we are passed entry IDs like "*-*" into
+                // XADD. in these cases, extractMillisecondsAndSequence helps to
+                // generate suitable millisecondsTime & sequenceNumber values.
+                // hence, the need to "refresh" the entry_id value to account
+                // for these auto-generated cases.
                 entry_id = std::to_string(millisecondsTime) + "-" +
                            std::to_string(sequenceNumber);
 
+                // keep track of the maxMillisecondsTime & maxSequenceNumber for
+                // XREAD's $ argument.
                 if (maxMillisecondsTime > millisecondsTime) {
                   maxMillisecondsTime = millisecondsTime;
                   maxSequenceNumber = sequenceNumber;
@@ -558,6 +530,7 @@ void handleClient(int client_fd, const std::string &dir,
                   maxSequenceNumber = sequenceNumber;
                 }
 
+                // entry format -> {entry_id, key value pairs in the entry}
                 std::pair<std::string, std::vector<std::string>> entry;
                 entry.first = entry_id;
                 for (int i = 3; i < message.elements.size(); i++) {
@@ -565,22 +538,28 @@ void handleClient(int client_fd, const std::string &dir,
                 }
                 streams[stream_key].push_back(entry);
 
-                response = "$" + std::to_string(entry_id.size()) + "\r\n" +
-                           entry_id + "\r\n";
+                response = ProtocolGenerator::createBulkString(entry_id);
               }
             }
+            // XRANGE -> outputs the stream entries from a particular stream in
+            // a whose entry IDs range between start & end
           } else if (command == "xrange") {
             std::string stream_key = message.elements[1].value;
 
             std::string start = message.elements[2].value,
                         end = message.elements[3].value;
 
+            // we start from the minimum entry ID.
             if (start == "-") {
               start = "0-1";
             }
+
+            // we end at the maximum entry ID.
             if (end == "+") {
               end = std::to_string((long long)1e18) + "-" + std::to_string(1e9);
             }
+
+            // we auto generate sequence number values, should they be omitted.
             if (start.find('-') == std::string::npos)
               start += "-0";
             if (end.find('-') == std::string::npos)
@@ -593,6 +572,7 @@ void handleClient(int client_fd, const std::string &dir,
 
             std::vector<std::pair<std::string, std::vector<std::string>>>
                 entriesToOutput;
+
             for (auto &entry : streams[stream_key]) {
               auto [entry_id, keyValuePairs] = entry;
               auto [curMillisecondsTime, curSequenceNumber] =
@@ -768,9 +748,14 @@ void handleClient(int client_fd, const std::string &dir,
         }
       }
 
+      // if the client we are handling in this case is the Master...
+      // then we should update our replica offset, since we processed a
+      // propagated command.
       if (client_fd == master_fd) {
         replica_offset += message.rawMessage.size();
       }
+
+      // keeps track of the response in each command in a transaction
       if (transactionExecuting) {
         transactionResponses.push_back(response);
       }
@@ -778,6 +763,7 @@ void handleClient(int client_fd, const std::string &dir,
     } while (transactionExecuting &&
              transactionNumber < transactionCommands.size());
 
+    // batch send the transaction responses.
     if (transactionExecuting) {
       response = "*" + std::to_string(transactionResponses.size()) + "\r\n";
       for (std::string &transactionResponse : transactionResponses) {
@@ -787,15 +773,11 @@ void handleClient(int client_fd, const std::string &dir,
       transactionBegun = false;
     }
 
+    // if we are facing a real client's commands, and not just propagated
+    // commands, send a response to the client
     if (client_fd != master_fd && sendResponse) {
       send(client_fd, response.c_str(), response.size(), 0);
     }
-
-    // }
-
-    // if (isPropagation && replicaof != "") {
-    //   propagated = true;
-    // }
   }
   close(client_fd);
 }
@@ -818,6 +800,7 @@ void executeHandshake(const std::string &dir, const std::string &dbfilename,
   master_addr.sin_addr.s_addr = MASTER_HOST;
   master_addr.sin_port = htons(MASTER_PORT);
 
+  // establishes a connection with the client socket with the master socket
   if (connect(clientSocket, (struct sockaddr *)&master_addr,
               sizeof(master_addr)) < 0) {
     perror("Connection failed");
@@ -872,26 +855,14 @@ int main(int argc, char **argv) {
   std::cout << std::unitbuf;
   std::cerr << std::unitbuf;
 
-  std::string dir = "";
-  std::string dbfilename = "";
+  // Extract Command Line arguments. dir & dbfilename - RDB files that contain
+  // the previous state of the database replicaof - port number of the master
+  // server of this replica port - which port number we connect to
+  std::string dir, dbfilename, replicaof;
   int port = 6379;
-  std::string replicaof = "";
+  extractCommandLineArguments(dir, dbfilename, port, replicaof, argc, argv);
 
-  for (int i = 1; i < argc; i++) {
-    if (std::string(argv[i]) == "--dir") {
-      dir = argv[i + 1];
-    }
-    if (std::string(argv[i]) == "--dbfilename") {
-      dbfilename = argv[i + 1];
-    }
-    if (std::string(argv[i]) == "--port") {
-      port = stoi(std::string(argv[i + 1]));
-    }
-    if (std::string(argv[i]) == "--replicaof") {
-      replicaof = std::string(argv[i + 1]);
-    }
-  }
-
+  // Instantiate a listening socket to listen for any connections
   int server_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd < 0) {
     std::cerr << "Failed to create server socket\n";
@@ -918,8 +889,11 @@ int main(int argc, char **argv) {
     return 1;
   }
 
-  // bind to master
-  int clientSocket = -1;
+  // Have the replica execute a handshake (back-and-forth pinging)
+  // asynchronously, that.. 1) ensures that the replica and master can
+  // communicate 2) master can send the current state of the database via a
+  // Redis Database (RDB) file and the replica can then sync with the current
+  // state of the database first by parsing the RDB file
   if (replicaof != "") {
     std::thread(executeHandshake, dir, dbfilename, port, replicaof).detach();
   }
@@ -930,18 +904,12 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  // blocks and awaits for any client connections
+  // client connections are then processed independently, concurrently with the
+  // handleClient function. This allows for greater availability as multiple
+  // clients can use the database at the same time.
   struct sockaddr_in client_addr;
   int client_addr_len = sizeof(client_addr);
-  std::cout << "Waiting for a client to connect...\n";
-
-  // You can use print statements as follows for debugging, they'll be visible
-  // when running tests.
-  std::cout << "Logs from your program will appear here!\n";
-
-  // Uncomment this block to pass the first stage
-
-  // accept(server_fd, (struct sockaddr *)&client_addr,
-  //        (socklen_t *)&client_addr_len);
   while (true) {
     int client_fd = accept(server_fd, (struct sockaddr *)&client_addr,
                            (socklen_t *)&client_addr_len);
@@ -952,9 +920,6 @@ int main(int argc, char **argv) {
           .detach();
     }
   }
-
-  if (clientSocket >= 0)
-    close(clientSocket);
   close(server_fd);
 
   return 0;
