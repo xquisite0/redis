@@ -9,7 +9,7 @@ std::string createNullBulkString();
 
 std::string createBulkString(std::string str);
 
-std::string createArray(std::vector<std::string> strs);
+std::string createArray(std::vector<std::string> strs, bool isPureStrings = 1);
 
 std::string createInteger(std::string integer);
 

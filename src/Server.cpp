@@ -573,6 +573,8 @@ void handleClient(int client_fd, const std::string &dir,
             std::vector<std::pair<std::string, std::vector<std::string>>>
                 entriesToOutput;
 
+            // iterate over every entry, and check whether their IDs fall into
+            // the range between start and end.
             for (auto &entry : streams[stream_key]) {
               auto [entry_id, keyValuePairs] = entry;
               auto [curMillisecondsTime, curSequenceNumber] =
@@ -591,7 +593,6 @@ void handleClient(int client_fd, const std::string &dir,
             }
 
             // we now have to format the entriesToOutput into RESP format
-
             response = "*" + std::to_string(entriesToOutput.size()) + "\r\n";
             for (auto &entry : entriesToOutput) {
               response += "*2\r\n";
@@ -600,12 +601,16 @@ void handleClient(int client_fd, const std::string &dir,
 
               response += "$" + std::to_string(entry_id.size()) + "\r\n" +
                           entry_id + "\r\n";
-              response += "*" + std::to_string(keyValuePairs.size()) + "\r\n";
 
-              for (std::string &elem : keyValuePairs) {
-                response +=
-                    "$" + std::to_string(elem.size()) + "\r\n" + elem + "\r\n";
-              }
+              response += ProtocolGenerator::createArray(keyValuePairs);
+              // response += "*" + std::to_string(keyValuePairs.size()) +
+              // "\r\n";
+
+              // for (std::string &elem : keyValuePairs) {
+              //   response +=
+              //       "$" + std::to_string(elem.size()) + "\r\n" + elem +
+              //       "\r\n";
+              // }
             }
           } else if (command == "xread") {
             std::vector<std::pair<std::string, std::string>> stream_keys_start;
