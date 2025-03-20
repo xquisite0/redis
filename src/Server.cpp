@@ -739,6 +739,7 @@ void handleClient(int client_fd, const std::string &dir,
 
                 std::string streamString = ProtocolGenerator::createArray(
                     {stream_key, entriesString}, 0);
+                response += streamString;
               }
             }
           } else if (command == "incr") {
